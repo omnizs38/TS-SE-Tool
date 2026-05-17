@@ -174,7 +174,7 @@ namespace TS_SE_Tool.Save.Items
         internal List<string> bus_stops { get; set; } = new List<string>();
 
         internal string bus_job_log { get; set; } = "";
-
+        internal List<string> unknown_lines { get; set; } = new List<string>();
         internal int bus_experience_points { get; set; } = 0;
         internal int bus_total_distance { get; set; } = 0;
         internal int bus_finished_job_count { get; set; } = 0;
@@ -195,6 +195,8 @@ namespace TS_SE_Tool.Save.Items
 
             foreach (string currentLine in _input)
             {
+                string originalLine = currentLine;
+
                 if (currentLine.Contains(':'))
                 {
                     string[] splittedLine = currentLine.Split(new char[] { ':' }, 2);
@@ -1068,6 +1070,12 @@ namespace TS_SE_Tool.Save.Items
                                 bus_playing_time = int.Parse(dataLine);
                                 break;
                             }
+                            default:
+                            {
+                                if(!string.IsNullOrWhiteSpace(originalLine) && originalLine.Trim() != "{" && originalLine.Trim() != "}")
+                                unknown_lines.Add(originalLine);
+                                break;
+                            }
                     }
                 }
                 catch (Exception ex)
@@ -1343,6 +1351,9 @@ namespace TS_SE_Tool.Save.Items
 
             returnSB.AppendLine(" bus_game_time: " + bus_game_time.ToString());
             returnSB.AppendLine(" bus_playing_time: " + bus_playing_time.ToString());
+
+            for(int i = 0; i < unknown_lines.Count; i++)
+                returnSB.AppendLine(unknown_lines[i]);
 
             returnSB.AppendLine("}");
 

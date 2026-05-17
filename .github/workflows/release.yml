@@ -1,0 +1,46 @@
+name: release-ts-se-tool
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore
+        run: nuget restore TS-SE-Tool.sln
+
+      - name: Build Release
+        run: msbuild TS-SE-Tool.sln /m /p:Configuration=Release
+
+      - name: Pack files
+        shell: powershell
+        run: |
+          $pkg = "release-package"
+          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
+          Get-ChildItem -Recurse -Path . -Include *.exe,*.dll,*.config,*.json |
+            Where-Object { $_.FullName -match '\\bin\\Release\\' } |
+            Copy-Item -Destination $pkg -Force
+          Compress-Archive -Path "$pkg\*" -DestinationPath "TS-SE-Tool-${{ github.ref_name }}.zip"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: TS-SE-Tool-${{ github.ref_name }}.zip
+          generate_release_notes: true
