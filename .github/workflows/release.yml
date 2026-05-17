@@ -24,10 +24,14 @@ jobs:
         uses: NuGet/setup-nuget@v2
 
       - name: Restore
-        run: nuget restore TS-SE-Tool.sln
+        shell: powershell
+         run: |
+            $sln = "TS SE Tool.sln" & nuget restore "$sln"
 
       - name: Build Release
-        run: msbuild TS-SE-Tool.sln /m /p:Configuration=Release
+        shell: powershell
+          run: |
+            $sln = "TS SE Tool.sln" & msbuild "$sln" /m /p:Configuration=Release
 
       - name: Pack files
         shell: powershell
