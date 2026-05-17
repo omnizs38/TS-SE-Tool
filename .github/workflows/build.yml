@@ -22,10 +22,10 @@ jobs:
         uses: NuGet/setup-nuget@v2
 
       - name: Restore packages
-        run: nuget restore TS-SE-Tool.sln
+        run: nuget restore TS SE Tool.sln
 
       - name: Build Release
-        run: msbuild TS-SE-Tool.sln /m /p:Configuration=Release
+        run: msbuild TS SE Tool.sln /m /p:Configuration=Release
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
