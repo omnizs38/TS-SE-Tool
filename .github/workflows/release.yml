@@ -2,6 +2,7 @@ name: release-ts-se-tool
 
 on:
   push:
+    branches: [ main, master ]
     tags:
       - 'v*'
   workflow_dispatch:
@@ -24,27 +25,32 @@ jobs:
         uses: NuGet/setup-nuget@v2
 
       - name: Restore
-        shell: powershell
-         run: |
-            $sln = "TS SE Tool.sln" & nuget restore "$sln"
+        run: nuget restore "TS SE Tool.sln"
 
       - name: Build Release
-        shell: powershell
-          run: |
-            $sln = "TS SE Tool.sln" & msbuild "$sln" /m /p:Configuration=Release
+        run: msbuild "TS SE Tool.sln" /m /p:Configuration=Release
 
       - name: Pack files
         shell: powershell
         run: |
           $pkg = "release-package"
           New-Item -ItemType Directory -Force -Path $pkg | Out-Null
-          Get-ChildItem -Recurse -Path . -Include *.exe,*.dll,*.config,*.json |
-            Where-Object { $_.FullName -match '\\bin\\Release\\' } |
-            Copy-Item -Destination $pkg -Force
+          
+          # Copy the TS SE Tool bin Release files recursively, retaining folder structures
+          Copy-Item -Path "TS SE Tool\bin\Release\*" -Destination $pkg -Recurse -Force
+          
+          # Copy TS SET Updater if it was built
+          if (Test-Path "TS SET Updater\bin\Release\TS SET Updater.exe") {
+            Copy-Item -Path "TS SET Updater\bin\Release\TS SET Updater.exe" -Destination $pkg -Force
+          }
+          
+          # Compress the directory structure into a zip file for the release
           Compress-Archive -Path "$pkg\*" -DestinationPath "TS-SE-Tool-${{ github.ref_name }}.zip"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}
+          prerelease: ${{ github.ref_type != 'tag' }}
           files: TS-SE-Tool-${{ github.ref_name }}.zip
           generate_release_notes: true
