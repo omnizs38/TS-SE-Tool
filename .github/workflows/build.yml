@@ -7,6 +7,10 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest
@@ -25,14 +29,11 @@ jobs:
         run: nuget restore "TS SE Tool.sln"
 
       - name: Build Release
-        run: msbuild "TS SE Tool.sln" /m /p:Configuration=Release
+        run: msbuild "TS SE Tool.sln" /m /p:Configuration=Release /p:Platform="Any CPU"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: TS-SE-Tool-Release
-          path: |
-            **/bin/Release/*.exe
-            **/bin/Release/*.dll
-            **/bin/Release/*.config
-            **/bin/Release/*.json
+          path: "TS SE Tool/bin/Release/**"
+          if-no-files-found: error
