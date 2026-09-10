@@ -1,0 +1,58 @@
+name: Build v97 stable
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ build/v97-stable ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout verified v97 source (danielrvieira/fix/savefile-v97)
+        uses: actions/checkout@v4
+        with:
+          repository: danielrvieira/TS-SE-Tool
+          ref: fix/savefile-v97
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore "TS SE Tool.sln"
+
+      - name: Build solution (Release)
+        run: msbuild "TS SE Tool.sln" /p:Configuration=Release /p:Platform="Any CPU" /m
+
+      - name: Package build output
+        shell: pwsh
+        run: |
+          $out = "TS SE Tool/bin/Release"
+          if (-not (Test-Path $out)) { throw "Build output not found at $out" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "$out/*" -DestinationPath "dist/TS-SE-Tool-v97.zip" -Force
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TS-SE-Tool-v97
+          path: dist/TS-SE-Tool-v97.zip
+          if-no-files-found: error
+
+      - name: Publish downloadable release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v97-stable"
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release delete $tag --cleanup-tag --yes --repo $env:GITHUB_REPOSITORY
+          }
+          gh release create $tag "dist/TS-SE-Tool-v97.zip" --repo $env:GITHUB_REPOSITORY --target master --title "TS SE Tool - v97 stable (ETS2/ATS 1.60-1.61)" --notes "Automated build of the verified savefile v97 fix (danielrvieira:fix/savefile-v97, upstream LIPtoH PR #147). Download TS-SE-Tool-v97.zip, extract, run 'TS SE Tool.exe'. Requires .NET Framework 4.7.2 or newer. ALWAYS back up your save before editing."
