@@ -50,9 +50,15 @@ namespace TS_SE_Tool
 
         private void PrepareForm()
         {
+            //Profile backup
+            string ProfilePathBackup = Globals.SelectedProfilePath + @"\profile_backup.sii";
+
+            if (!File.Exists(ProfilePathBackup))
+                buttonRestoreProfileBackup.Enabled = false;
+
             //dialog result
-            buttonSave.DialogResult = DialogResult.OK;
-            buttonCancel.DialogResult = DialogResult.Cancel;
+            buttonOK.DialogResult = DialogResult.Cancel;
+
         }
 
         private void FormProfileEditor_Load(object sender, EventArgs e)
@@ -62,15 +68,15 @@ namespace TS_SE_Tool
             WorkingProfileName = Utilities.TextUtilities.FromHexToString(WorkingProfilePath.Split(new string[] { "\\" }, StringSplitOptions.None).Last());
 
             //Profile type
-            ProfileType = ((DataTable)ParentForm.comboBoxPrevProfiles.DataSource).Rows[ParentForm.comboBoxPrevProfiles.SelectedIndex].ItemArray[2].ToString();
+            ProfileType = ((DataTable)ParentForm.comboBoxRootFolders.DataSource).Rows[ParentForm.comboBoxRootFolders.SelectedIndex].ItemArray[2].ToString();
 
             labelProfileNameValue.Text = WorkingProfileName;
         }
+
         private void FormProfileEditor_Shown(object sender, EventArgs e)
         {
-            buttonCancel.Focus();
+            buttonOK.Focus();
         }
-
 
         private void CorrectControlsPositions()
         {
@@ -106,6 +112,8 @@ namespace TS_SE_Tool
                         labelProfileNameValue.Text = dForm.ReturnNewName;
 
                         MessageBox.Show("New Profile name - " + dForm.ReturnNewName);
+
+                        buttonOK.DialogResult = DialogResult.OK;
                     }
                 }
             }
@@ -126,10 +134,54 @@ namespace TS_SE_Tool
                 {
                     if (dForm.ReturnCloningSuccessful)
                     {
-                        MessageBox.Show("Created new Profiles (" + dForm.ReturnClonedNames.Count.ToString() + "):\r\n\r\n" + string.Join("\r\n", dForm.ReturnClonedNames));
+                        MessageBox.Show("New Profiles created ( " + dForm.ReturnClonedNames.Count.ToString() + " ):" +
+                            Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, dForm.ReturnClonedNames));
+
+                        buttonOK.DialogResult = DialogResult.OK;
                     }
                     else
+                    {
                         MessageBox.Show("No profiles created due to duplicating names.");
+                    }   
+                }
+            }
+        }
+
+        //Restore Backup
+        private void buttonRestoreProfileBackup_Click(object sender, EventArgs e)
+        {
+            string ProfilePath = Globals.SelectedProfilePath + @"\profile.sii",
+                   ProfilePathBackup = Globals.SelectedProfilePath + @"\profile_backup.sii";
+
+            if (File.Exists(ProfilePathBackup))
+            {
+                DialogResult dr = MessageBox.Show("Restoring from backup file will overwrite existing file." + Environment.NewLine +
+                                                  "Select: Yes - Overwrite | No - Swap files | Cancel - Abort restoring.",
+                                                  "Restoring Profile from Backup", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+
+                if (dr == DialogResult.Cancel)
+                    return;
+
+                if (dr == DialogResult.No)
+                {
+                    SwapFiles(ProfilePath, ProfilePathBackup);
+                }
+                else
+                {
+                    File.Copy(ProfilePathBackup, ProfilePath, true);
+
+                    File.Delete(ProfilePathBackup);
+                }
+
+                void SwapFiles(string _firstFile, string _secondFile)
+                {
+                    string tmpFile = Directory.GetParent(_firstFile).FullName + "\\tmp";
+
+                    File.Copy(_firstFile, tmpFile, true);
+                    File.Copy(_secondFile, _firstFile, true);
+                    File.Copy(tmpFile, _secondFile, true);
+
+                    File.Delete(tmpFile);
                 }
             }
         }
@@ -177,11 +229,5 @@ namespace TS_SE_Tool
         {
             this.Close();
         }
-
-        private void buttonCancel_Click(object sender, EventArgs e)
-        {
-            this.Close();
-        }
-
     }
 }

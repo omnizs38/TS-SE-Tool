@@ -44,6 +44,8 @@ namespace TS_SE_Tool.Save.Items
                     switch (tagLine)
                     {
                         case "":
+                        case "vehicle_cargo_accessory":
+                        case "}":
                             {
                                 break;
                             }
@@ -71,12 +73,19 @@ namespace TS_SE_Tool.Save.Items
                                 refund = uint.Parse(dataLine);
                                 break;
                             }
+
+                        default:
+                            {
+                                UnidentifiedLines.Add(currentLine);
+                                IO_Utilities.ErrorLogWriter(WriteErrorMsg(tagLine, dataLine));
+                                break;
+                            }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Utilities.IO_Utilities.ErrorLogWriter(ex.Message + Environment.NewLine + this.GetType().Name.ToLower() + " | " + tagLine + " = " + dataLine);
-                    break;
+                    IO_Utilities.ErrorLogWriter(WriteErrorMsg(ex.Message, tagLine, dataLine));
+                    continue;
                 }
             }
         }
@@ -95,6 +104,8 @@ namespace TS_SE_Tool.Save.Items
             returnSB.AppendLine(" data_path: " + data_path);
             returnSB.AppendLine(" refund: " + refund.ToString());
 
+            returnSB.Append(WriteUnidentifiedLines());
+
             returnSB.AppendLine("}");
 
             returnString = returnSB.ToString();
@@ -102,6 +113,11 @@ namespace TS_SE_Tool.Save.Items
             this.removeWritenBlock(_nameless);
 
             return returnString;
+        }
+
+        public override string ToString()
+        {
+            return base.ToString().Split(new char[] { '.' })[3];
         }
     }
 }

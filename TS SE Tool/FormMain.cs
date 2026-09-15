@@ -31,6 +31,7 @@ using System.Deployment.Application;
 using System.Threading;
 
 using TS_SE_Tool.Utilities;
+using JR.Utils.GUI.Forms;
 
 namespace TS_SE_Tool
 {
@@ -50,7 +51,6 @@ namespace TS_SE_Tool
         public bool FileDecoded;  //+
 
         internal string GameType;//Program
-        private string SavefilePath; //+
 
         private string LoopStartCity;//Program
         private string LoopStartCompany;//Program
@@ -74,20 +74,21 @@ namespace TS_SE_Tool
 
         private List<City> CitiesList;//+
         private List<string> CitiesListDB;//Program
-        private List<string> CitiesListDiff;//Program
 
         private List<Cargo> CargoesList; //+
         private List<Cargo> CargoesListDB;//Program
-        private List<Cargo> CargoesListDiff;//Program
 
         private Dictionary<string, List<string>> TrailerDefinitionVariants;//Program
         private List<string> TrailerVariants;//Program
+
+        private Dictionary<string, List<string>> TrailerDefinitionVariantsDB;
+        private List<string> TrailerDefinitionListDB;
+        private List<string> TrailerVariantsListDB;
 
         private List<string> HeavyCargoList;
 
         private List<string> CompaniesList; //+
         private List<string> CompaniesListDB;//Program
-        private List<string> CompaniesListDiff;//Program
 
         private List<string> CountriesList;//Program
 
@@ -101,7 +102,6 @@ namespace TS_SE_Tool
 
         private List<CompanyTruck> CompanyTruckList;//Program
         private List<CompanyTruck> CompanyTruckListDB;//Program
-        private List<CompanyTruck> CompanyTruckListDiff;//Program
 
         private List<ExtCompany> ExternalCompanies;//Program cache
         private List<ExtCargo> ExtCargoList;//Program cache
@@ -109,9 +109,9 @@ namespace TS_SE_Tool
 
         private DateTime LastModifiedTimestamp; //+
 
-        internal static Save.Items.SiiNunit SiiNunitData;
+        internal Save.Items.SiiNunit SiiNunitData;
 
-        public SaveFileProfileData MainSaveFileProfileData;
+        internal SaveFileProfileData MainSaveFileProfileData;
         internal SaveFileInfoData MainSaveFileInfoData;
 
         //
@@ -136,7 +136,7 @@ namespace TS_SE_Tool
         private Dictionary<string, UserCompanyTrailerData> UserTrailerDictionary; //+
         private Dictionary<string, Save.Items.Trailer_Def> UserTrailerDefDictionary; //+
 
-        private List<string> namelessList;//Program
+        //private List<string> namelessList;//Program
         private string namelessLast;//Program
 
         private Dictionary<string, List<string>> GPSbehind, GPSahead, GPSAvoid, GPSbehindOnline, GPSaheadOnline; //+
@@ -144,13 +144,12 @@ namespace TS_SE_Tool
         internal Dictionary<string, double> DistanceMultipliers; //Program
         internal Dictionary<string, double> WeightMultipliers; //Program
 
-        private DataTable DistancesTable; //Program
+        //internal static Bitmap ProgressBarGradient; //Program
 
-        private Bitmap ProgressBarGradient; //Program
-        private Image RepairImg, RefuelImg, CustomizeImg, PlayerCompanyLogo; //Program
+        private Image RepairImg, RefuelImg, CustomizeImg; //Program
 
-        private Image[] ADRImgS, ADRImgSGrey, SkillImgSBG, SkillImgS, GaragesImg, GaragesHQImg, CitiesImg, UrgencyImg, CargoTypeImg, CargoType2Img, 
-            TruckPartsImg, TrailerPartsImg, GameIconeImg; //Program
+        internal Image[] MainIcons, ADRImgS, ADRImgSGrey, SkillImgSBG, SkillImgS, GaragesImg, GaragesHQImg, CitiesImg, UrgencyImg, CargoTypeImg, CargoType2Img, 
+            TruckPartsImg, TrailerPartsImg, VehicleIntegrityPBImg, GameIconeImg, AccessoriesImg; //Program
 
         internal Dictionary<string, Image> ProgUIImgsDict;
 
@@ -176,6 +175,10 @@ namespace TS_SE_Tool
 
         internal Dictionary<string, Dictionary<UInt16, SCS.SCSFontLetter>> GlobalFontMap;
         internal Dictionary<string, byte> LicensePlateWidth;
+
+        internal bool TssetFoldersExist = false;
+        internal bool ForseExit = false;
+
         #endregion
 
         public FormMain()
@@ -183,19 +186,20 @@ namespace TS_SE_Tool
             IO_Utilities.LogWriter("Initializing form...");
             InitializeComponent();
             IO_Utilities.LogWriter("Form initialized.");
-            //Non program task
-            IO_Utilities.LogWriter("Caching game data...");
-            CacheGameData();
-            IO_Utilities.LogWriter("Caching finished.");
 
             //Program
+            SteamSelectedTimer.Tick += SteamSelectedTimer_Tick;
+            SteamSelectedTimer.Interval = 800;
+
             UpdateStatusBarMessage.OnNewStatusMessage += UpdateStatusBarMessage_OnNewStatusMessage;
+            UpdateStatusBarMessage.OnNewMessageBox += ShowMessageBox_OnNewMessageBox;
             this.Icon = Properties.Resources.MainIco;
             this.Text += " [ " + AssemblyData.AssemblyVersion + " ]";
 
             SetDefaultValues(true);
             IO_Utilities.LogWriter("Loading config...");
             ProgSettingsV.LoadConfigFromFile();
+            CheckTssetFoldersExist();
             ApplySettings();
             IO_Utilities.LogWriter("Config loaded.");
 
@@ -208,7 +212,8 @@ namespace TS_SE_Tool
             //Create page controls
             IO_Utilities.LogWriter("Creating form elements...");
             CreateProfilePanelControls();
-            CreateProgressBarBitmap();
+            CreateCompanyPanelControls();
+            Graphics_TSSET.CreateProgressBarBitmap();
             CreateTruckPanelControls();
             CreateTrailerPanelControls();
             IO_Utilities.LogWriter("Done.");
@@ -225,6 +230,11 @@ namespace TS_SE_Tool
             GetTranslationFiles();
             ChangeLanguage();
             IO_Utilities.LogWriter("Done.");
+
+            //Non program task
+            IO_Utilities.LogWriter("Caching game data...");
+            CacheGameData();
+            IO_Utilities.LogWriter("Caching finished.");
         }
 
         private void FormMain_Shown(object sender, EventArgs e)
@@ -232,31 +242,38 @@ namespace TS_SE_Tool
             IO_Utilities.LogWriter("Opening form...");
             try
             {
-                if (Properties.Settings.Default.ShowSplashOnStartup || Properties.Settings.Default.CheckUpdatesOnStartup)
-                {
-                    FormSplash WindowSplash = new FormSplash();
-                    WindowSplash.ShowDialog();
-                }
                 IO_Utilities.LogWriter("Done.");
+
+                if (Properties.Settings.Default.ShowSplashOnStartup || Properties.Settings.Default.CheckUpdatesOnStartup)
+                    OpenSplashScreen();                
             }
             catch
             {
                 IO_Utilities.LogWriter("Done. Settings error.");
-                FormSplash WindowSplash = new FormSplash();
-                WindowSplash.ShowDialog();
+
+                OpenSplashScreen();
             }
 
             DetectGame();
+
+            void OpenSplashScreen()
+            {
+                FormSplash WindowSplash = new FormSplash();
+                WindowSplash.ShowDialog();
+            }
         }
 
         private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
         {
             DialogResult exitDR;
 
+            if (this.ForseExit)            
+                return;
+
             if (AddedJobsDictionary != null && AddedJobsDictionary.Count > 0)
-                exitDR = MessageBox.Show("You have unsaved changes. Do you really want to close down application?", "Close Application without saving changes", MessageBoxButtons.YesNo);
+                exitDR = FlexibleMessageBox.Show(this, "You have unsaved changes."+ Environment.NewLine + "Do you really want to close down application?", "Close Application without saving changes", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation, MessageBoxDefaultButton.Button2);
             else
-                exitDR = MessageBox.Show("Do you really want to close down application?", "Close Application", MessageBoxButtons.YesNo);
+                exitDR = FlexibleMessageBox.Show(this, "Do you really want to close down application?", "Close Application", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
 
             if (exitDR == DialogResult.Yes)
             {
@@ -289,19 +306,21 @@ namespace TS_SE_Tool
     public class Globals
     {
         //-----
-        public static string[] ProfilesPaths;
-        public static List<string> ProfilesHex;
+        public static string[] ProfilesPaths = new string[0];
+        public static List<string> ProfilesHex = new List<string>();
         //
-        public static string SelectedProfile;
-        public static string SelectedProfilePath;
+        public static string SelectedProfile = "";
+        public static string SelectedProfilePath = "";
+        public static string SelectedProfileName = "";
         //----
         public static string[] SavesHex = new string[0];
         //
-        public static string SelectedSave;
-        public static string SelectedSavePath;
+        public static string SelectedSave = "";
+        public static string SelectedSavePath = "";
+        public static string SelectedSaveName = "";
         //----
-        public static int[] PlayerLevelUps;
-        public static string CurrencyName;
+        public static int[] PlayerLevelUps = new int[0];
+        public static string CurrencyName = "";
     }
 
 }

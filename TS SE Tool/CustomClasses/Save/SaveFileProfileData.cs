@@ -21,40 +21,32 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
+
 using TS_SE_Tool.Utilities;
+using TS_SE_Tool.Save.DataFormat;
+using TS_SE_Tool.Save.Items;
 
 namespace TS_SE_Tool
 {
-    public class SaveFileProfileData
+    class SaveFileProfileData : SiiNBlockCore
     {
         internal string  UserProfileNameless    { get; set; } = "";
 
         //---
-        public bool     GenederMale         { get; set; } = false;
+        internal bool   GenderMale         { get; set; } = false;
         internal ushort Face                { get; set; } = 0;
         internal string Brand               { get; set; } = "";
 
-        public string   Logo                { get; set; } = "";
+        internal string Logo                { get; set; } = "";
 
-        internal string CompanyName         { get; set; } = "";
-        internal string _CompanyName
-        {
-            get
-            {
-                return TextUtilities.FromStringToOutputString(CompanyName);
-            }
-            set
-            {
-                CompanyName = TextUtilities.CheckAndClearStringFromQuotes(value);
-            }
-        }
+        internal SCS_String CompanyName         { get; set; } = "";
 
         //---
         internal string MapPath             { get; set; } = "";
 
         //---
-        public uint     CachedExperiencePoints  { get; set; } = 0;
-        public uint     CachedDistance          { get; set; } = 0;
+        internal uint   CachedExperiencePoints  { get; set; } = 0;
+        internal uint   CachedDistance          { get; set; } = 0;
 
         //---
         #region UserData
@@ -65,19 +57,20 @@ namespace TS_SE_Tool
         internal string     ud1_WoTLicensePlate     { get; set; } = "";     //1 WoT licenseplate
         internal string     ud2_SomeCheckSum        { get; set; } = "";     //2 ???
         internal byte?      ud3_WoTConnected        { get; set; } = null;   //3 isWoTConnected?
-        public decimal      ud4_RoadsExplored       { get; set; } = 0.0M;   //4 Road explored persentage
-        public uint         ud5_DeliveriesFinished  { get; set; } = 0;      //5 Finished deliveries
-        public uint         ud6_OwnedTrucks         { get; set; } = 0;      //6 Owned trucks count
-        public uint         ud7_OwnedGaradesSmall   { get; set; } = 0;      //7 Small garages 
-        public uint         ud8_OwnedGaradesLarge   { get; set; } = 0;      //8 Large garages
-        public ulong        ud9_GameTimeSpent       { get; set; } = 0;      //9 Game time spent
-        public uint         ud10_RealTimeSpent      { get; set; } = 0;      //10 Real time spent
-        public string       ud11_CurrentTruck       { get; set; } = "";     //11 Current truck //brand.model
-        public List<string> ud12_OwnedTruckList = new List<string>();       //12 Owned trucks //brand.model:count,brand.model:count,...;
+        internal decimal      ud4_RoadsExplored       { get; set; } = 0.0M;   //4 Road explored persentage
+        internal uint         ud5_DeliveriesFinished  { get; set; } = 0;      //5 Finished deliveries
+        internal uint         ud6_OwnedTrucks         { get; set; } = 0;      //6 Owned trucks count
+        internal uint         ud7_OwnedGaradesSmall   { get; set; } = 0;      //7 Small garages 
+        internal uint         ud8_OwnedGaradesLarge   { get; set; } = 0;      //8 Large garages
+        internal ulong        ud9_GameTimeSpent       { get; set; } = 0;      //9 Game time spent
+        internal uint         ud10_RealTimeSpent      { get; set; } = 0;      //10 Real time spent
+        internal string       ud11_CurrentTruck       { get; set; } = "";     //11 Current truck //brand.model
+
+        internal List<string> ud12_OwnedTruckList = new List<string>();       //12 Owned trucks //brand.model:count,brand.model:count,...;
         internal string     ud13_SomeUserData       { get; set; } = "";     //13 ???
         internal uint?      ud14_SomeUserData       { get; set; } = null;   //14 ??? //0
         internal string     ud15_SomeUserData       { get; set; } = "";     //15 ??? //production
-        public uint         ud16_OwnedTrailers      { get; set; } = 0;      //16 Owned trailers
+        internal uint         ud16_OwnedTrailers      { get; set; } = 0;      //16 Owned trailers
 
         #region user data backend
 
@@ -261,50 +254,22 @@ namespace TS_SE_Tool
         //End
         internal byte   Version         { get; set; } = 0;      //profile data format version
 
-        internal string OnlineUserName  { get; set; } = "";
-        internal string _OnlineUserName
-        {
-            get
-            {
-                return TextUtilities.FromStringToOutputString(OnlineUserName);
-            }
-            set
-            {
-                OnlineUserName = TextUtilities.CheckAndClearStringFromQuotes(value);
-            }
-        }
+        internal SCS_String OnlineUserName  { get; set; } = "";
 
-        internal string OnlinePassword  { get; set; } = "";
-        internal string _OnlinePassword
-        {
-            get
-            {
-                return TextUtilities.FromStringToOutputString(OnlinePassword);
-            }
-            set
-            {
-                OnlinePassword = TextUtilities.CheckAndClearStringFromQuotes(value);
-            }
-        }
+        internal SCS_String OnlinePassword  { get; set; } = "";
 
-        internal string ProfileName     { get; set; } = "";
-        internal string _ProfileName
-        {
-            get
-            {
-                return TextUtilities.FromStringToOutputString(ProfileName);
-            }
-            set
-            {
-                ProfileName = TextUtilities.CheckAndClearStringFromQuotes(value);
-            }
-        }
+        internal SCS_String ProfileName     { get; set; } = "";
 
-        public uint     CreationTime    { get; set; } = 0;
-        public uint     SaveTime        { get; set; } = 0;
+        internal uint   CreationTime    { get; set; } = 0;
+        internal uint   SaveTime        { get; set; } = 0;
 
         //====
-        Dictionary<string, string> unsortedDataDictionary = new Dictionary<string, string>();
+
+        internal bool isEdited { get; set; } = false;
+
+        int unsortedOrder = 0;
+
+        Dictionary<int, List<string>> unsortedDataDict = new Dictionary<int, List<string>>();
 
         //====
         private char[] charsToTrim = new char[] { '"' };
@@ -316,8 +281,335 @@ namespace TS_SE_Tool
             set { this.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).SetValue(this, value, null); }
         }
 
-        //Methods
-        //
+        public void ProcessData(string[] _fileLines)
+        {
+            string[] lineParts;
+            string currentLine = "";
+            string tagLine = "", dataLine = "";
+
+            for (int lineNumber = 0; lineNumber < _fileLines.Length; lineNumber++)
+            {
+                currentLine = _fileLines[lineNumber].Trim();
+
+                if (currentLine.Contains(':'))
+                {
+                    string[] splittedLine = currentLine.Split(new char[] { ':' }, 2);
+
+                    tagLine = splittedLine[0].Trim();
+                    dataLine = splittedLine[1].Trim();
+                }
+                else
+                {
+                    tagLine = currentLine.Trim();
+                    dataLine = "";
+                }
+                try
+                {
+                    switch (tagLine)
+                    {
+                        case "SiiNunit":
+                            {
+                                unsortedDataDict.Add(unsortedOrder, new List<string>());
+                                break;
+                            }
+                        case "":
+                        case "{":
+                            {
+                                break;
+                            }
+                        case "}":
+                            {
+                                unsortedOrder++;
+                                unsortedDataDict.Add(unsortedOrder, new List<string>());
+                                break;
+                            }
+
+                        case "user_profile":
+                            {
+                                unsortedOrder++;
+                                unsortedDataDict.Add(unsortedOrder, new List<string>());
+
+                                UserProfileNameless = dataLine.Split(new char[] { '{' })[0].Trim();
+                                break;
+                            }
+
+                        case "face":
+                            {
+                                Face = ushort.Parse(dataLine);
+                                break;
+                            }
+
+                        case "brand":
+                            {
+                                Brand = dataLine;
+                                break;
+                            }
+
+                        case "map_path":
+                            {
+                                MapPath = dataLine;
+                                break;
+                            }
+
+                        case "logo":
+                            {
+                                Logo = dataLine;
+                                break;
+                            }
+
+                        case "company_name":
+                            {
+                                CompanyName = dataLine;
+                                break;
+                            }
+
+                        case "male":
+                            {
+                                GenderMale = bool.Parse(dataLine);
+                                break;
+                            }
+
+                        case "cached_experience":
+                            {
+                                CachedExperiencePoints = uint.Parse(dataLine);
+                                break;
+                            }
+
+                        case "cached_distance":
+                            {
+                                CachedDistance = uint.Parse(dataLine);
+                                break;
+                            }
+
+                        case "user_data":
+                            {
+                                UserDataSize = uint.Parse(dataLine);
+
+                                user_data_array = new string[UserDataSize];
+
+                                for (int i = 0; i < UserDataSize; i++)
+                                {
+                                    lineNumber++;
+                                    lineParts = _fileLines[lineNumber].Split(new char[] { ':' }, 2);
+
+                                    string udNumber = lineParts[0].Split(new char[] { '[', ']' }, 3)[1];
+                                    string udValue = lineParts[1].Trim();
+
+                                    string propertyName = "user_data_" + i.ToString();
+
+                                    if (this.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic) != null)
+                                        this[propertyName] = udValue;
+
+                                    user_data_array[int.Parse(udNumber)] = udValue;
+                                }
+                                break;
+                            }
+
+                        case "active_mods":
+                            {
+                                ActiveMods = new List<string>(int.Parse(dataLine));
+
+                                for (int x = 0; x < ActiveMods.Capacity; x++)
+                                {
+                                    lineNumber++;
+                                    lineParts = _fileLines[lineNumber].Split(new char[] { ':' }, 2);
+                                    ActiveMods.Add(lineParts[1].Trim());
+                                }
+                                break;
+                            }
+
+                        case "customization":
+                            {
+                                Customization = uint.Parse(dataLine);
+                                break;
+                            }
+
+                        case "cached_stats":
+                            {
+                                CachedStats = new List<ushort>(int.Parse(dataLine));
+
+                                for (int x = 0; x < CachedStats.Capacity; x++)
+                                {
+                                    lineNumber++;
+                                    lineParts = _fileLines[lineNumber].Split(new char[] { ':' });
+                                    CachedStats.Add(ushort.Parse(lineParts[1].Trim()));
+                                }
+                                break;
+                            }
+
+                        case "cached_discovery":
+                            {
+                                CachedDiscovery = new List<ushort>(int.Parse(dataLine));
+
+                                for (int x = 0; x < CachedDiscovery.Capacity; x++)
+                                {
+                                    lineNumber++;
+                                    lineParts = _fileLines[lineNumber].Split(new char[] { ':' });
+                                    CachedDiscovery.Add(ushort.Parse(lineParts[1].Trim()));
+                                }
+                                break;
+                            }
+
+                        case "version":
+                            {
+                                Version = byte.Parse(dataLine);
+                                break;
+                            }
+
+                        case "online_user_name":
+                            {
+                                OnlineUserName = dataLine;
+                                break;
+                            }
+
+                        case "online_password":
+                            {
+                                OnlinePassword = dataLine;
+                                break;
+                            }
+
+                        case "profile_name":
+                            {
+                                ProfileName = dataLine;
+                                break;
+                            }
+
+                        case "creation_time":
+                            {
+                                CreationTime = uint.Parse(dataLine);
+                                break;
+                            }
+
+                        case "save_time":
+                            {
+                                SaveTime = uint.Parse(dataLine);
+                                break;
+                            }
+
+                        default:
+                            {
+                                unsortedDataDict[unsortedOrder].Add(currentLine);
+
+                                IO_Utilities.ErrorLogWriter(WriteErrorMsg(tagLine, dataLine));
+                                break;
+                            }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    IO_Utilities.ErrorLogWriter(WriteErrorMsg(ex.Message, tagLine, dataLine));
+                    continue;
+                }
+            }
+        }
+
+        public string PrintOut()
+        {
+            int unsortedOrder = 0;
+
+            StringBuilder sbResult = new StringBuilder();
+
+            bool verCheck4 = (new sbyte[] { 4 }).Any(x => x == Version);
+            bool verCheck5 = (new sbyte[] { 5, 6 }).Any(x => x == Version);
+
+            sbResult.AppendLine("SiiNunit");
+            sbResult.AppendLine("{");
+
+            writeUnsortedLines();
+
+            sbResult.AppendLine("user_profile : " + UserProfileNameless + " {");
+            sbResult.AppendLine(" face: " + Face.ToString());
+            sbResult.AppendLine(" brand: " + Brand);
+            sbResult.AppendLine(" map_path: " + MapPath);
+            sbResult.AppendLine(" logo: " + Logo);
+            sbResult.AppendLine(" company_name: " + CompanyName.ToString());
+            sbResult.AppendLine(" male: " + GenderMale.ToString().ToLower());
+            sbResult.AppendLine(" cached_experience: " + CachedExperiencePoints.ToString());
+            sbResult.AppendLine(" cached_distance: " + CachedDistance.ToString());
+
+            if (verCheck4)
+                sbResult.AppendLine(writeVersionOnline());
+            
+            sbResult.AppendLine(" user_data: " + UserDataSize.ToString());
+                for (int i = 0; i < UserDataSize; i++)
+                {
+                    string propertyName = "user_data_" + i.ToString();
+
+                    if (this.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic) != null)
+                        sbResult.AppendLine(" user_data[" + i.ToString() + "]: " + this[propertyName]);
+                    else
+                        //user_data_array holds the value only, not the whole line. Savefile
+                        //v97 grew user_data past the 17 slots this build models, and writing
+                        //the bare value produced a malformed profile.sii.
+                        sbResult.AppendLine(" user_data[" + i.ToString() + "]: " + (user_data_array[i] ?? "\"\""));
+                }
+
+            sbResult.AppendLine(" active_mods: " + ActiveMods.Capacity.ToString());
+                for (int i = 0; i < ActiveMods.Capacity; i++)
+                {
+                    sbResult.AppendLine(" active_mods[" + i.ToString() + "]: " + ActiveMods[i].ToString());
+                }
+
+            sbResult.AppendLine(" customization: " + Customization.ToString());
+
+            sbResult.AppendLine(" cached_stats: " + CachedStats.Capacity.ToString());
+                for (int i = 0; i < CachedStats.Capacity; i++)
+                {
+                    sbResult.AppendLine(" cached_stats[" + i.ToString() + "]: " + CachedStats[i].ToString());
+                }
+
+            sbResult.AppendLine(" cached_discovery: " + CachedDiscovery.Capacity.ToString());
+                for (int i = 0; i < CachedDiscovery.Capacity; i++)
+                {
+                    sbResult.AppendLine(" cached_discovery[" + i.ToString() + "]: " + CachedDiscovery[i].ToString());
+                }
+
+            if (verCheck5 || !verCheck4)
+                sbResult.AppendLine(writeVersionOnline());
+
+            sbResult.AppendLine(" profile_name: " + ProfileName.ToString());
+            sbResult.AppendLine(" creation_time: " + CreationTime.ToString());
+            sbResult.AppendLine(" save_time: " + SaveTime.ToString());
+
+            writeUnsortedLines();
+
+            //===
+
+            sbResult.AppendLine("}");
+
+            writeUnsortedLines();
+
+            sbResult.AppendLine();
+            sbResult.Append("}");
+
+            return sbResult.ToString();
+
+            //=== Help methods
+
+            void writeUnsortedLines()
+            {
+                if (unsortedDataDict[unsortedOrder].Count > 0)
+                {
+                    foreach (string line in unsortedDataDict[unsortedOrder])
+                        sbResult.AppendLine(line);
+                }
+                unsortedOrder++;
+            }
+
+            string writeVersionOnline()
+            {
+                StringBuilder sbVerOnline = new StringBuilder();
+
+                sbVerOnline.AppendLine(" version: " + Version.ToString());
+                sbVerOnline.AppendLine(" online_user_name: " + OnlineUserName.ToString());
+                sbVerOnline.Append    (" online_password: " + OnlinePassword.ToString());
+
+                return sbVerOnline.ToString();
+            }
+        }
+
+        //=== Methods
+        
         public int[] getPlayerLvl()
         {
             int CurrentLVL = 0, lvlthreshhold = 0;
@@ -327,13 +619,13 @@ namespace TS_SE_Tool
             {
                 lvlthreshhold += lvlstep;
 
-                if (CachedExperiencePoints < lvlthreshhold)                
-                    return Result = new int[] { CurrentLVL, lvlthreshhold};
-                                   
-                else                
-                    CurrentLVL++;                
+                if (CachedExperiencePoints < lvlthreshhold)
+                    return Result = new int[] { CurrentLVL, lvlthreshhold };
+
+                else
+                    CurrentLVL++;
             }
-            
+
             int finalthreshhold = Globals.PlayerLevelUps[Globals.PlayerLevelUps.Length - 1];
 
             do
@@ -377,322 +669,16 @@ namespace TS_SE_Tool
 
             StringBuilder sbResult = new StringBuilder();
 
-            foreach(string _line in _newText)
+            foreach (string _line in _newText)
                 sbResult.AppendLine(_line);
 
             return sbResult.ToString();
         }
 
-        //
-        public void ProcessData(string[] _fileLines)
-        {
-            string[] lineParts;
-            string currentLine = "";
-            string tagLine = "", dataLine = "";
-
-            byte exitLoopMarker = 2;
-
-            for (int lineNumber = 0; lineNumber < _fileLines.Length; lineNumber++)
-            {
-                currentLine = _fileLines[lineNumber].Trim();
-
-                if (currentLine.Contains(':'))
-                {
-                    string[] splittedLine = currentLine.Split(new char[] { ':' }, 2);
-
-                    tagLine = splittedLine[0].Trim();
-                    dataLine = splittedLine[1].Trim();
-                }
-                else
-                {
-                    tagLine = currentLine.Trim();
-                    dataLine = "";
-                }
-
-                switch (tagLine)
-                {
-                    case "SiiNunit":
-                    case "":
-                        {
-                            break;
-                        }
-
-                    case "{":
-                        {
-                            break;
-                        }
-                    case "}":
-                        {
-                            --exitLoopMarker;
-
-                            if (exitLoopMarker <= 0)
-                                goto endOfProcessData;
-
-                            break;
-                        }
-
-                    case "user_profile":
-                        {
-                            UserProfileNameless = dataLine.Split(new char[] { '{' })[0].Trim();
-                            break;
-                        }
-
-                    case "face":
-                        {
-                            Face = ushort.Parse(dataLine);
-                            break;
-                        }
-
-                    case "brand":
-                        {
-                            Brand = dataLine;
-                            break;
-                        }
-
-                    case "map_path":
-                        {
-                            MapPath = dataLine;
-                            break;
-                        }
-
-                    case "logo":
-                        {
-                            Logo = dataLine;
-                            break;
-                        }
-
-                    case "company_name":
-                        {
-                            _CompanyName = dataLine;
-                            break;
-                        }
-
-                    case "male":
-                        {
-                            GenederMale = bool.Parse(dataLine);
-                            break;
-                        }
-
-                    case "cached_experience":
-                        {
-                            CachedExperiencePoints = uint.Parse(dataLine);
-                            break;
-                        }
-
-                    case "cached_distance":
-                        {
-                            CachedDistance = uint.Parse(dataLine);
-                            break;
-                        }
-
-                    case "user_data":
-                        {
-                            UserDataSize = uint.Parse(dataLine);
-
-                            user_data_array = new string[UserDataSize];
-
-                            for (int i = 0; i < UserDataSize; i++)
-                            {
-                                lineNumber++;
-                                lineParts = _fileLines[lineNumber].Split(new char[] { ':' }, 2);
-
-                                string udNumber = lineParts[0].Split(new char[] { '[', ']' }, 3)[1];
-                                string udValue = lineParts[1].Trim();
-
-                                string propertyName = "user_data_" + i.ToString();
-
-                                if (this.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic) != null)
-                                    this[propertyName] = udValue;
-
-                                user_data_array[int.Parse(udNumber)] = udValue;
-                            }
-                            break;
-                        }
-
-                    case "active_mods":
-                        {
-                            ActiveMods = new List<string>(int.Parse(dataLine));
-
-                            for (int x = 0; x < ActiveMods.Capacity; x++)
-                            {
-                                lineNumber++;
-                                lineParts = _fileLines[lineNumber].Split(new char[] { ':' }, 2);
-                                ActiveMods.Add(lineParts[1].Trim());
-                            }
-                            break;
-                        }
-
-                    case "customization":
-                        {
-                            Customization = uint.Parse(dataLine);
-                            break;
-                        }
-
-                    case "cached_stats":
-                        {
-                            CachedStats = new List<ushort>(int.Parse(dataLine));
-
-                            for (int x = 0; x < CachedStats.Capacity; x++)
-                            {
-                                lineNumber++;
-                                lineParts = _fileLines[lineNumber].Split(new char[] { ':' });
-                                CachedStats.Add(ushort.Parse(lineParts[1].Trim()));
-                            }
-                            break;
-                        }
-
-                    case "cached_discovery":
-                        {
-                            CachedDiscovery = new List<ushort>(int.Parse(dataLine));
-
-                            for (int x = 0; x < CachedDiscovery.Capacity; x++)
-                            {
-                                lineNumber++;
-                                lineParts = _fileLines[lineNumber].Split(new char[] { ':' });
-                                CachedDiscovery.Add(ushort.Parse(lineParts[1].Trim()));
-                            }
-                            break;
-                        }
-
-                    case "version":
-                        {
-
-                            Version = byte.Parse(dataLine);
-                            break;
-                        }
-                        
-                    case "online_user_name":
-                        {
-                            _OnlineUserName = dataLine;
-                            break;
-                        }
-
-                    case "online_password":
-                        {
-                            _OnlinePassword = dataLine;
-                            break;
-                        }
-
-                    case "profile_name":
-                        {
-                            _ProfileName = dataLine;
-                            break;
-                        }
-
-                    case "creation_time":
-                        {
-                            CreationTime = uint.Parse(dataLine);
-                            break;
-                        }
-
-                    case "save_time":
-                        {
-                            SaveTime = uint.Parse(dataLine);
-                            break;
-                        }
-                        
-                    default:
-                        {
-                            unsortedDataDictionary.Add(tagLine, dataLine);
-                            break;
-                        }
-                }
-            }
-
-            endOfProcessData:;
-        }
-
-        public string GetTextFileFormat()
-        {
-            StringBuilder sbResult = new StringBuilder();
-
-            sbResult.AppendLine("SiiNunit");
-            sbResult.AppendLine("{");
-
-            sbResult.AppendLine("user_profile : " + UserProfileNameless + " {");
-            sbResult.AppendLine(" face: " + Face.ToString());
-            sbResult.AppendLine(" brand: " + Brand);
-            sbResult.AppendLine(" map_path: " + MapPath);
-            sbResult.AppendLine(" logo: " + Logo);
-            sbResult.AppendLine(" company_name: " + _CompanyName);
-            sbResult.AppendLine(" male: " + GenederMale.ToString().ToLower());
-            sbResult.AppendLine(" cached_experience: " + CachedExperiencePoints.ToString());
-            sbResult.AppendLine(" cached_distance: " + CachedDistance.ToString());
-
-            bool verCheck4 = (new sbyte[] { 4 }).Any(x => x == Version);
-            if (verCheck4)
-                sbResult.AppendLine(VerOnline());
-            
-            sbResult.AppendLine(" user_data: " + UserDataSize.ToString());
-                for (int i = 0; i < UserDataSize; i++)
-                {
-                    string propertyName = "user_data_" + i.ToString();
-
-                    if (this.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic) != null)
-                        sbResult.AppendLine(" user_data[" + i.ToString() + "]: " + this[propertyName]);
-                    else                    
-                        sbResult.AppendLine(user_data_array[i]);                    
-                }
-
-            sbResult.AppendLine(" active_mods: " + ActiveMods.Capacity.ToString());
-                for (int i = 0; i < ActiveMods.Capacity; i++)
-                {
-                    sbResult.AppendLine(" active_mods[" + i.ToString() + "]: " + ActiveMods[i].ToString());
-                }
-
-            sbResult.AppendLine(" customization: " + Customization.ToString());
-
-            sbResult.AppendLine(" cached_stats: " + CachedStats.Capacity.ToString());
-                for (int i = 0; i < CachedStats.Capacity; i++)
-                {
-                    sbResult.AppendLine(" cached_stats[" + i.ToString() + "]: " + CachedStats[i].ToString());
-                }
-
-            sbResult.AppendLine(" cached_discovery: " + CachedDiscovery.Capacity.ToString());
-                for (int i = 0; i < CachedDiscovery.Capacity; i++)
-                {
-                    sbResult.AppendLine(" cached_discovery[" + i.ToString() + "]: " + CachedDiscovery[i].ToString());
-                }
-
-            bool verCheck5 = (new sbyte[] { 5, 6 }).Any(x => x == Version);
-            if (verCheck5 || !verCheck4)            
-                sbResult.AppendLine(VerOnline());
-
-            sbResult.AppendLine(" profile_name: " + _ProfileName);
-            sbResult.AppendLine(" creation_time: " + CreationTime.ToString());
-            sbResult.AppendLine(" save_time: " + SaveTime.ToString());
-
-            //Add lines with unsorted data
-            if (unsortedDataDictionary.Count > 0)
-            {
-                foreach( KeyValuePair<string, string> record  in unsortedDataDictionary)
-                {
-                    sbResult.AppendLine(" " + record.Key + ": " + record.Value);
-                }
-            }
-            //===
-
-            sbResult.AppendLine("}");
-            sbResult.AppendLine();
-            sbResult.Append("}");
-
-            return sbResult.ToString();
-
-            string VerOnline()
-            {
-                StringBuilder sbVerOnline = new StringBuilder();
-
-                sbVerOnline.AppendLine(" version: " + Version.ToString());
-                sbVerOnline.AppendLine(" online_user_name: " + _OnlineUserName);
-                sbVerOnline.Append(" online_password: " + _OnlinePassword);
-
-                return sbVerOnline.ToString();
-            }
-        }
-
+        //===
         public void WriteToStream(StreamWriter _streamWriter)
         {
-            _streamWriter.Write(GetTextFileFormat());
+            _streamWriter.Write(PrintOut());
         }
     }
 }

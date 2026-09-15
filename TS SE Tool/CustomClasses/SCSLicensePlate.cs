@@ -80,8 +80,11 @@ namespace TS_SE_Tool.SCS
 
             //Load Font data
             string fontDataPath = @"img\" + MainForm.GameType + @"\lpFont\" + SourceLPCountry + @".font";
-            CreateFontMap(fontDataPath);
 
+            if (File.Exists(fontDataPath))
+                CreateFontMap(fontDataPath);
+
+            //Create license plate
             Create();
         }
 
@@ -145,17 +148,21 @@ namespace TS_SE_Tool.SCS
                 }
             }
 
-            if (IMGpath == "")
-                DrawWarning("NON STANDART COUNTRY");
-            else
+            if (IMGpath != "" && MainForm.GlobalFontMap.ContainsKey(SourceLPCountry))
                 ValidLPcountry = true;
+            else
+                DrawWarning("NON STANDART COUNTRY");
 
             Dictionary<UInt16, SCSFontLetter> thisFontMap = new Dictionary<ushort, SCSFontLetter>();
 
             if (ValidLPcountry)
             {
                 //Load BG image
-                Image BGImg = MainForm.ExtImgLoader(new string[] { IMGpath })[0];
+                Image BGImg = Utilities.Graphics_TSSET.ddsImgLoader(IMGpath).images[0];
+
+                if (BGImg == null)
+                    return;
+
                 //
                 LicensePlateIMG = new Bitmap(BGImg.Width * 4, BGImg.Height * 4);
                 LicensePlateTXT = "";
@@ -184,28 +191,34 @@ namespace TS_SE_Tool.SCS
 
                 if (letter == "<")
                 {
-                    string tagtext = _lpText.Substring(i + 1, _lpText.IndexOf('>', i + 1) - i - 1).Trim(new char[] { ' ' });
+                    int arrowIdxClose = _lpText.IndexOf('>', i + 1),
+                        arrowIdxOpen = _lpText.IndexOf('<', i + 1);
 
-                    //Detect tag type
-                    int tagend = tagtext.IndexOf(' ');
-                    int blockend = tagtext.Length - 1;
-
-                    if (tagend != -1 && blockend > tagend)
+                    if (arrowIdxClose != -1 && (arrowIdxOpen == -1 || arrowIdxClose < arrowIdxOpen) )
                     {
-                        tag = tagtext.Substring(0, tagend);
-                    }
-                    else if (tagend == -1)
-                    {
-                        tag = tagtext.Substring(0, ++blockend);
-                    }
+                        string tagtext = _lpText.Substring(i + 1, _lpText.IndexOf('>', i + 1) - i - 1).Trim(new char[] { ' ' });
 
-                    //
-                    DetectTag(tag, tagtext);
+                        //Detect tag type
+                        int tagend = tagtext.IndexOf(' ');
+                        int blockend = tagtext.Length - 1;
 
-                    //skip to ">"
-                    int skip = _lpText.IndexOf('>', i + 1) - i;
-                    i = i + skip;
-                    continue;
+                        if (tagend != -1 && blockend > tagend)
+                        {
+                            tag = tagtext.Substring(0, tagend);
+                        }
+                        else if (tagend == -1)
+                        {
+                            tag = tagtext.Substring(0, ++blockend);
+                        }
+
+                        //
+                        DetectTag(tag, tagtext);
+
+                        //skip to ">"
+                        int skip = _lpText.IndexOf('>', i + 1) - i;
+                        i = i + skip;
+                        continue;
+                    }
                 }
                 else
                 {
@@ -354,28 +367,35 @@ namespace TS_SE_Tool.SCS
                             break;
 
                         datapos = _tagtext.IndexOf("hshift");
-                        if (datapos != -1)
-                        {
-                            eqpos = _tagtext.IndexOf('=', datapos) + 1;
-                            spacepos = _tagtext.IndexOf(' ', datapos);
 
-                            if (spacepos == -1)
-                                spacepos = _tagtext.Length;
-
-                            cursorPos += Convert.ToInt32(Convert.ToInt32(_tagtext.Substring(eqpos, spacepos - eqpos)) * 3.2);
-                        }                            
+                        if (datapos != -1)                        
+                            cursorPos += (int)Math.Round(processData() * 3.2);
 
                         datapos = _tagtext.IndexOf("vshift");
-                        if (datapos != -1)
+
+                        if (datapos != -1)                        
+                            vshift += processData();                        
+
+                        int processData()
                         {
                             eqpos = _tagtext.IndexOf('=', datapos) + 1;
-                            spacepos = _tagtext.IndexOf(' ', datapos);
+                            spacepos = _tagtext.IndexOf(' ', eqpos);
 
                             if (spacepos == -1)
                                 spacepos = _tagtext.Length;
 
-                            vshift += Convert.ToInt32(_tagtext.Substring(eqpos, spacepos - eqpos));
-                        }                        
+                            string Number = _tagtext.Substring(eqpos, spacepos - eqpos);
+
+                            if (Number != "")
+                            {
+                                if (int.TryParse(Number, out int res))
+                                {
+                                    return res;
+                                }
+                            }
+
+                            return 0;
+                        }
 
                         break;
                     }
@@ -390,59 +410,107 @@ namespace TS_SE_Tool.SCS
                         //img source
                         datapos = _tagtext.IndexOf("src");
                         eqpos = _tagtext.IndexOf('=', datapos) + 1;
-                        spacepos = _tagtext.IndexOf(' ', datapos);
+                        spacepos = _tagtext.IndexOf(' ', eqpos);
 
                         if (spacepos == -1)
                             spacepos = _tagtext.Length;
 
                         string imgsource = _tagtext.Substring(eqpos, spacepos - eqpos);
-                        int imgwidth = 0, imgheight = 0;
+
+                        if (string.IsNullOrEmpty(imgsource))
+                            break;
+
                         //
+                        int imgwidth = 0, imgheight = 0;
+
                         datapos = _tagtext.IndexOf("width");
+
                         if (datapos != -1)
-                        {
-                            eqpos = _tagtext.IndexOf('=', datapos) + 1;
-                            spacepos = _tagtext.IndexOf(' ', datapos);
+                            imgwidth = processData();
 
-                            if (spacepos == -1)
-                                spacepos = _tagtext.Length;
-
-                            imgwidth = Convert.ToInt32(_tagtext.Substring(eqpos, spacepos - eqpos));
-                        }
+                        if (imgwidth < 0)
+                            break;
+                        
                         //
                         datapos = _tagtext.IndexOf("height");
+
                         if (datapos != -1)
+                            imgheight = processData();
+
+                        if (imgheight < 0)
+                            break;
+
+                        int processData()
                         {
                             eqpos = _tagtext.IndexOf('=', datapos) + 1;
-                            spacepos = _tagtext.IndexOf(' ', datapos);
+                            spacepos = _tagtext.IndexOf(' ', eqpos);
 
                             if (spacepos == -1)
                                 spacepos = _tagtext.Length;
 
-                            imgheight = Convert.ToInt32(_tagtext.Substring(eqpos, spacepos - eqpos));
+                            string Number = _tagtext.Substring(eqpos, spacepos - eqpos);
+
+                            if (Number != "")
+                            {
+                                if (int.TryParse(Number, out int res))
+                                {
+                                    return res;
+                                }
+                            }
+
+                            return -1;
                         }
 
-                        //
-                        string imgToLoadmat = imgsource.Split(new string[] { "/material/ui/lp" }, StringSplitOptions.RemoveEmptyEntries).Last();
+                        //MAT
+                        string gameFilepathMat = imgsource.Split(new string[] { "/material/ui/lp" }, StringSplitOptions.RemoveEmptyEntries).Last();
 
-                        string imgToLoad = imgToLoadmat.Substring(0, imgToLoadmat.LastIndexOf('.'));
+                        string imgpath = gameFilepathMat.Substring(0, gameFilepathMat.LastIndexOf('/') + 1);
 
                         //Side detect
-                        if (imgToLoad.IndexOf("$SIDE$") != 1)
+                        if (gameFilepathMat.IndexOf("$SIDE$") != 1)
                         {
                             string side = "front";
 
                             if (LicensePlateType == LPtype.Trailer)
                                 side = "rear";
 
-                            imgToLoad = imgToLoad.Replace("$SIDE$", side);
+                            gameFilepathMat = gameFilepathMat.Replace("$SIDE$", side);
                         }
 
-                        //Resize
+                        //TOBJ
+                        string tobjFilepath = "";
+                        string imgToLoadMat = @"img\" + MainForm.GameType + @"\lp" + gameFilepathMat;
+
+                        if (File.Exists(imgToLoadMat))
+                        {
+                            tobjFilepath = new SCSfiles.fileMAT(imgToLoadMat).texture;
+                        }
+                        else
+                            break;
+
+                        //DDS
+                        string gameFilepathDds = "";
+                        string imgToLoadTobj = @"img\" + MainForm.GameType + @"\lp" + imgpath + tobjFilepath;
+
+                        if (File.Exists(imgToLoadTobj))
+                        {
+                            gameFilepathDds = new SCSfiles.fileTOBJ(imgToLoadTobj).texture_path;
+                        }
+                        else
+                            break;
+
+                        string ddsFilepath = gameFilepathDds.Split(new string[] { "/material/ui/lp" }, StringSplitOptions.RemoveEmptyEntries).Last();
 
                         //Load img
-                        string tmpImgPath = @"img\" + MainForm.GameType + @"\lp" + imgToLoad + @".dds";
-                        Image tmpImg = MainForm.ExtImgLoader(new string[] { tmpImgPath })[0];
+                        string tmpImgPath = @"img\" + MainForm.GameType + @"\lp" + ddsFilepath;
+                        var tmpTuple = Utilities.Graphics_TSSET.ddsImgLoader(new string[] { tmpImgPath });
+
+                        Image tmpImg;
+
+                        if (tmpTuple.validity[0])
+                            tmpImg = tmpTuple.images[0];
+                        else
+                            tmpImg = null;
 
                         //Draw img
                         if (tmpImg != null)
@@ -500,27 +568,34 @@ namespace TS_SE_Tool.SCS
 
                         //<font xscale=0.8 yscale=0.8>
                         datapos = _tagtext.IndexOf("xscale");
-                        if (datapos != -1)
-                        {
-                            eqpos = _tagtext.IndexOf('=', datapos) + 1;
-                            spacepos = _tagtext.IndexOf(' ', datapos);
 
-                            if (spacepos == -1)
-                                spacepos = _tagtext.Length;
-
-                            fontXscale = Convert.ToDecimal(_tagtext.Substring(eqpos, spacepos - eqpos), CultureInfo.InvariantCulture);
-                        }
+                        if (datapos != -1)                        
+                            fontXscale = processData();                        
 
                         datapos = _tagtext.IndexOf("yscale");
-                        if (datapos != -1)
+
+                        if (datapos != -1)                        
+                            fontYscale = processData();                        
+
+                        decimal processData()
                         {
                             eqpos = _tagtext.IndexOf('=', datapos) + 1;
-                            spacepos = _tagtext.IndexOf(' ', datapos);
+                            spacepos = _tagtext.IndexOf(' ', eqpos);
 
                             if (spacepos == -1)
                                 spacepos = _tagtext.Length;
 
-                            fontYscale = Convert.ToDecimal(_tagtext.Substring(eqpos, spacepos - eqpos), CultureInfo.InvariantCulture);
+                            string Number = _tagtext.Substring(eqpos, spacepos - eqpos);
+
+                            if (Number != "")
+                            {
+                                if (decimal.TryParse(Number, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out decimal res))
+                                {
+                                    return res;
+                                }
+                            }
+
+                            return 1;
                         }
 
                         break;
@@ -549,13 +624,16 @@ namespace TS_SE_Tool.SCS
                             if (spacepos == -1)
                                 spacepos = _tagtext.Length;
 
-
                             string hexScsColorString = _tagtext.Substring(eqpos, spacepos - eqpos);
-                            int[] hexColorParts = SplitNConvertSSCHexColor(hexScsColorString, 2).ToArray();
 
-                            int tmpAlpha = hexColorParts[0], tmpRed = hexColorParts[3], tmpGreen = hexColorParts[2], tmpBlue = hexColorParts[1];
+                            if (hexScsColorString.Length == 8)
+                            {
+                                int[] hexColorParts = SplitNConvertSSCHexColor(hexScsColorString, 2).ToArray();
 
-                            FontColor = Color.FromArgb(tmpAlpha, tmpRed, tmpGreen, tmpBlue);
+                                int tmpAlpha = hexColorParts[0], tmpRed = hexColorParts[3], tmpGreen = hexColorParts[2], tmpBlue = hexColorParts[1];
+
+                                FontColor = Color.FromArgb(tmpAlpha, tmpRed, tmpGreen, tmpBlue);
+                            }
                         }
 
                         break;
@@ -570,30 +648,43 @@ namespace TS_SE_Tool.SCS
                         //choose column (left or right) and set left offset
                         //Set leftoffset
                         //Set internal offset
-                        datapos = _tagtext.IndexOf("right");
+
+                        bool left = true;
+
+                        if (_tagtext.IndexOf("right") != -1)
+                            left = false;
+
+                        if (left)
+                            datapos = _tagtext.IndexOf("left");
+                        else
+                            datapos = _tagtext.IndexOf("right");
+
                         if (datapos != -1)
                         {
-                            eqpos = _tagtext.IndexOf('=', datapos) + 1;
-                            spacepos = _tagtext.IndexOf(' ', datapos);
+                            eqpos = _tagtext.IndexOf('=', datapos);
 
-                            if (spacepos == -1)
-                                spacepos = _tagtext.Length;
+                            if (eqpos != -1 && eqpos >= datapos + 4) 
+                            {
+                                eqpos++;
 
-                            allignOffset = (int)(Convert.ToInt32(_tagtext.Substring(eqpos, spacepos - eqpos)) * 1.6);
-                        }
+                                spacepos = _tagtext.IndexOf(' ', eqpos);
 
-                        datapos = _tagtext.IndexOf("left");
-                        if (datapos != -1)
-                        {
-                            eqpos = _tagtext.IndexOf('=', datapos) + 1;
-                            spacepos = _tagtext.IndexOf(' ', datapos);
+                                if (spacepos == -1)
+                                    spacepos = _tagtext.Length;
 
-                            if (spacepos == -1)
-                                spacepos = _tagtext.Length;
+                                string offsetNumber = _tagtext.Substring(eqpos, spacepos - eqpos);
 
-                            allignOffset = (int)(Convert.ToInt32(_tagtext.Substring(eqpos, spacepos - eqpos)) * 1.6);
+                                if (offsetNumber != "")
+                                {
+                                    if (int.TryParse(offsetNumber, out int res))
+                                    {
+                                        allignOffset = (int)Math.Round(res * 1.6, 0);
 
-                            leftOffset = baseAllignOffset[MainForm.GameType] + 232;
+                                        if (left)
+                                            leftOffset = baseAllignOffset[MainForm.GameType] + 232;
+                                    }
+                                }
+                            }
                         }
 
                         break;
@@ -634,28 +725,34 @@ namespace TS_SE_Tool.SCS
                     }
 
                 case "sup":
-                    // 75% size
-                    // 44% up
-                    fontSupSubScale = 0.6m;
-                    vshift +=2;
-                    break;
+                    {
+                        // 75% size 44% up
+                        fontSupSubScale = 0.6m;
+                        vshift += 2;
+                        break;
+                    }
 
                 case "/sup":
-                    fontSupSubScale = 1m;
-                    vshift -=2;
-                    break;
+                    {
+                        fontSupSubScale = 1m;
+                        vshift -= 2;
+                        break;
+                    }
 
                 case "sub":
-                    // 75% size
-                    // 16% down
-                    fontSupSubScale = 0.75m;
-                    vshift -= 5;
-                    break;
+                    {
+                        // 75% size 16% down
+                        fontSupSubScale = 0.75m;
+                        vshift -= 5;
+                        break;
+                    }
 
                 case "/sub":
-                    fontSupSubScale = 1m;
-                    vshift += 5;
-                    break;
+                    {
+                        fontSupSubScale = 1m;
+                        vshift += 5;
+                        break;
+                    }
             }
         }
 
@@ -735,14 +832,19 @@ namespace TS_SE_Tool.SCS
 
             //Load Font 
             IMGpath = @"img\" + gametype + @"\lpFont\" + fontimg + @".dds";
-            Image FontImg = MainForm.ExtImgLoader(new string[] { IMGpath })[0];
+            Image FontImg = null;
+
+            if (File.Exists(IMGpath))
+                FontImg = Utilities.Graphics_TSSET.ddsImgLoader(IMGpath).images[0];
+
+            if (FontImg == null)
+                return;
 
             //Create font map
             foreach (KeyValuePair< UInt16, SCSFontLetter> letter in thisFontMap)
             {
                 if (letter.Value.Width == 0 || letter.Value.Height == 0)
-                {
-                }
+                { }
                 else
                 {
                     Rectangle rect = new Rectangle(letter.Value.P_x, letter.Value.P_y, letter.Value.Width, letter.Value.Height);

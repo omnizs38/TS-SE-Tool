@@ -1,11 +1,12 @@
-﻿/*
-   Copyright 2016-2022 LIPtoH <liptoh.codebase@gmail.com>
+/*
+   Original work copyright 2016-2022 LIPtoH <liptoh.codebase@gmail.com>.
+   Maintenance modifications copyright 2026 omnizs38 and contributors.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+       https://www.apache.org/licenses/LICENSE-2.0
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,104 +15,84 @@
    limitations under the License.
 */
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using System.Threading;
-using System.Diagnostics;
+using System.Windows.Forms;
 using TS_SE_Tool.Utilities;
-using System.Configuration;
 
 namespace TS_SE_Tool
 {
-    static class Program
+    internal static class Program
     {
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
         [STAThread]
-        static void Main()
+        private static void Main(string[] args)
         {
-            // Add the event handler for handling UI thread exceptions to the event
-            Application.ThreadException += new ThreadExceptionEventHandler(UIThreadException);
+            if (args.Length > 0 && string.Equals(args[0], "--selftest", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.ExitCode = Diagnostics.SelfTest.Run(args);
+                return;
+            }
 
-            // Set the unhandled exception mode to force all Windows Forms errors to go through handler
+            Application.ThreadException += UIThreadException;
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomainUnhandledException;
 
-            // Add the event handler for handling non-UI thread exceptions to the event
-            AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
-
-            IO_Utilities.LogWriter("--- START ---");
-            IO_Utilities.LogWriter(AssemblyData.AssemblyProduct + " - " + AssemblyData.AssemblyVersion);
-            DetectEnviroment.DetectOS();
-            DetectEnviroment.Get45PlusFromRegistry();
-
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new FormMain());
-            IO_Utilities.LogWriter("--- END ---");
-        }
-
-        // Handle the UI exceptions by showing a dialog box, and asking the user whether
-        // or not they wish to abort execution.
-        private static void UIThreadException(object sender, ThreadExceptionEventArgs t)
-        {
-            DialogResult result = DialogResult.Cancel;
             try
             {
-                Exception ex = t.Exception;
+                IO_Utilities.LogWriter("--- START ---");
+                IO_Utilities.LogWriter(AssemblyData.AssemblyProduct + " - " + AssemblyData.AssemblyVersion);
+                DetectEnviroment.DetectOS();
+                DetectEnviroment.Get45PlusFromRegistry();
 
-                string errorMsg = "An application error occurred. Please contact the Developer at " + Utilities.Web_Utilities.External.linkMailDeveloper + " . Information can be found in \" Errorlog \" file.";
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.Run(new FormMain());
+            }
+            finally
+            {
+                TryWriteLog("--- END ---");
+            }
+        }
 
-                IO_Utilities.ErrorLogWriter(ex.Message + "\n\nStack Trace:\n" + ex.StackTrace);
+        private static void UIThreadException(object sender, ThreadExceptionEventArgs eventArgs)
+        {
+            ReportUnexpectedError(eventArgs.Exception, "Windows Forms error");
+        }
 
-                result = MessageBox.Show(errorMsg, "Windows Forms Error", MessageBoxButtons.AbortRetryIgnore, MessageBoxIcon.Stop);
+        private static void CurrentDomainUnhandledException(object sender, UnhandledExceptionEventArgs eventArgs)
+        {
+            Exception exception = eventArgs.ExceptionObject as Exception
+                ?? new InvalidOperationException("An unknown non-UI error terminated the application.");
+
+            ReportUnexpectedError(exception, "Application error");
+        }
+
+        private static void ReportUnexpectedError(Exception exception, string caption)
+        {
+            TryWriteLog(exception.ToString());
+
+            string message =
+                "An unexpected error occurred. Details were written to errorlog.log.\r\n\r\n" +
+                "Please report the problem at:\r\n" + Web_Utilities.IssuesUrl;
+
+            try
+            {
+                MessageBox.Show(message, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch
             {
-                try
-                {
-                    MessageBox.Show("Fatal Windows Forms Error", "Fatal Windows Forms Error", MessageBoxButtons.AbortRetryIgnore, MessageBoxIcon.Stop);
-                }
-                finally
-                {
-                    Application.Exit();
-                }
+                // The process may already be shutting down. Logging above is the fallback.
             }
-
-            // Exits the program when the user clicks Abort.
-            if (result == DialogResult.Abort)
-                Application.Exit();
         }
 
-        // Handle the UI exceptions by showing a dialog box, and asking the user whether
-        // or not they wish to abort execution.
-        // NOTE: This exception cannot be kept from terminating the application - it can only 
-        // log the event, and inform the user about it. 
-        private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        private static void TryWriteLog(string message)
         {
             try
             {
-                Exception ex = (Exception)e.ExceptionObject;
-
-                string errorMsg = "An application error occurred. Please contact the Developer at " + Utilities.Web_Utilities.External.linkMailDeveloper + " . Information can be found in \" Errorlog \" file.";
-
-                MessageBox.Show(errorMsg, "Non-UI Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-
-                IO_Utilities.ErrorLogWriter(ex.Message + "\n\nStack Trace:\n" + ex.StackTrace);
+                IO_Utilities.ErrorLogWriter(message);
             }
-            catch (Exception exc)
+            catch
             {
-                try
-                {
-                    MessageBox.Show("Fatal Non-UI Error. Could not write the error to the event log.\r\nReason: " 
-                        + exc.Message, "Fatal Non-UI Error", MessageBoxButtons.OK, MessageBoxIcon.Stop);
-                }
-                finally
-                {
-                    Application.Exit();
-                }
+                // Error reporting must never throw a second exception.
             }
         }
     }

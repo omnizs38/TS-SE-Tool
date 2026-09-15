@@ -14,8 +14,8 @@
    limitations under the License.
 */
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace TS_SE_Tool.Utilities
 {
@@ -24,29 +24,30 @@ namespace TS_SE_Tool.Utilities
         public static float HexFloatToSingleFloat(string _input)
         {
             if (_input.Contains('&'))
-            {               
-                //Split
+            {
                 string[] stringByteArray = SplitStringIntoChunks(_input.Substring(1), 2).ToArray();
-
-                //Reverse order
                 Array.Reverse(stringByteArray);
 
-                //Get bytes
-                byte[] tmpByteArray = BitConverter.GetBytes( uint.Parse(string.Concat(stringByteArray),System.Globalization.NumberStyles.HexNumber) );
+                byte[] tmpByteArray = BitConverter.GetBytes(
+                    uint.Parse(
+                        string.Concat(stringByteArray),
+                        System.Globalization.NumberStyles.HexNumber));
 
-                if (BitConverter.IsLittleEndian)                
-                    tmpByteArray = tmpByteArray.Reverse().ToArray();
+                if (BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(tmpByteArray);
+                }
 
-                //Result
                 return BitConverter.ToSingle(tmpByteArray, 0);
             }
-            else
-            {
-                return float.Parse(_input, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
-            }
+
+            return float.Parse(
+                _input,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        static IEnumerable<string> SplitStringIntoChunks(string str, int chunkSize)
+        private static IEnumerable<string> SplitStringIntoChunks(string str, int chunkSize)
         {
             return Enumerable.Range(0, str.Length / chunkSize)
                 .Select(i => str.Substring(i * chunkSize, chunkSize));
@@ -54,7 +55,7 @@ namespace TS_SE_Tool.Utilities
 
         public static string SingleFloatToString(float _input)
         {
-            if (!Single.IsNaN(_input))
+            if (!float.IsNaN(_input))
             {
                 int intFloat = (int)_input;
 
@@ -62,29 +63,19 @@ namespace TS_SE_Tool.Utilities
                 {
                     return "&" + SingleFloatToHexFloat(_input);
                 }
-                else
-                {
-                    return _input.ToString("g6", System.Globalization.CultureInfo.InvariantCulture);
-                }
+
+                return _input.ToString("g6", System.Globalization.CultureInfo.InvariantCulture);
             }
-            else
-            {
-                return "&" + SingleFloatToHexFloat(_input);
-            }
+
+            return "&" + SingleFloatToHexFloat(_input);
         }
 
         public static string SingleFloatToHexFloat(float _input)
         {
-            //Get bytes
             byte[] tmpByteArray = BitConverter.GetBytes(_input);
-
-            //Reverse order
             Array.Reverse(tmpByteArray);
 
-            //remove dashes and make it lower case
-            string hexFloat = BitConverter.ToString(tmpByteArray).Replace("-", "").ToLower();
-
-            return hexFloat;
+            return BitConverter.ToString(tmpByteArray).Replace("-", string.Empty).ToLowerInvariant();
         }
 
         public static string IntegerToHexString(uint _integer)
@@ -99,7 +90,8 @@ namespace TS_SE_Tool.Utilities
 
         public static IEnumerable<int> SplitNConvertSSCHexColor(string _inputStr, int chunkSize)
         {
-            return Enumerable.Range(0, _inputStr.Length / chunkSize).Select(i => Convert.ToInt32(_inputStr.Substring(i * chunkSize, chunkSize), 16));
+            return Enumerable.Range(0, _inputStr.Length / chunkSize)
+                .Select(i => Convert.ToInt32(_inputStr.Substring(i * chunkSize, chunkSize), 16));
         }
     }
 }

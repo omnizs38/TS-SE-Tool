@@ -25,11 +25,11 @@ namespace TS_SE_Tool.Save.Items
 
         internal string my_truck { get; set; } = "";
 
-        internal Vector_3f_4f my_truck_placement { get; set; } = new Vector_3f_4f();
+        internal SCS_Placement my_truck_placement { get; set; } = new SCS_Placement();
 
         internal bool my_truck_placement_valid { get; set; } = false;
 
-        internal Vector_3f_4f my_trailer_placement { get; set; } = new Vector_3f_4f();
+        internal SCS_Placement my_trailer_placement { get; set; } = new SCS_Placement();
 
         internal SCS_Float my_slave_trailer_placements { get; set; } = 0;
 
@@ -43,13 +43,14 @@ namespace TS_SE_Tool.Save.Items
 
         internal bool assigned_trailer_connected { get; set; } = false;
 
-        internal Vector_3f_4f truck_placement { get; set; } = new Vector_3f_4f();
+        internal SCS_Placement truck_placement { get; set; } = new SCS_Placement();
 
-        internal Vector_3f_4f trailer_placement { get; set; } = new Vector_3f_4f();
+        internal SCS_Placement trailer_placement { get; set; } = new SCS_Placement();
 
         internal SCS_Float slave_trailer_placements { get; set; } = 0;
 
         internal bool schedule_transfer_to_hq { get; set; } = false;
+        internal bool schedule_quick_travel { get; set; } = false;
 
         internal int flags { get; set; } = 0;
 
@@ -81,6 +82,14 @@ namespace TS_SE_Tool.Save.Items
 
         internal List<bool> driver_quit_warned { get; set; } = new List<bool>();
 
+        //v1.49
+
+        internal List<int> driver_flags { get; set; } = new List<int>();
+
+        internal List<int> driver_undrivable_truck_timers { get; set; } = new List<int>();
+
+        //v1.49
+
         #endregion
         internal Player()
         { }
@@ -108,6 +117,8 @@ namespace TS_SE_Tool.Save.Items
                     switch (tagLine)
                     {
                         case "":
+                        case "player":
+                        case "}":
                             {
                                 break;
                             }
@@ -168,7 +179,7 @@ namespace TS_SE_Tool.Save.Items
 
                         case "my_truck_placement":
                             {
-                                my_truck_placement = new Vector_3f_4f(dataLine);
+                                my_truck_placement = new SCS_Placement(dataLine);
                                 break;
                             }
 
@@ -180,7 +191,7 @@ namespace TS_SE_Tool.Save.Items
 
                         case "my_trailer_placement":
                             {
-                                my_trailer_placement = new Vector_3f_4f(dataLine);
+                                my_trailer_placement = new SCS_Placement(dataLine);
                                 break;
                             }
 
@@ -222,13 +233,13 @@ namespace TS_SE_Tool.Save.Items
 
                         case "truck_placement":
                             {
-                                truck_placement = new Vector_3f_4f(dataLine);
+                                truck_placement = new SCS_Placement(dataLine);
                                 break;
                             }
 
                         case "trailer_placement":
                             {
-                                trailer_placement = new Vector_3f_4f(dataLine);
+                                trailer_placement = new SCS_Placement(dataLine);
                                 break;
                             }
 
@@ -241,6 +252,12 @@ namespace TS_SE_Tool.Save.Items
                         case "schedule_transfer_to_hq":
                             {
                                 schedule_transfer_to_hq = bool.Parse(dataLine);
+                                break;
+                            }
+
+                        case "schedule_quick_travel":
+                            {
+                                schedule_quick_travel = bool.Parse(dataLine);
                                 break;
                             }
 
@@ -369,12 +386,47 @@ namespace TS_SE_Tool.Save.Items
                                 driver_quit_warned.Add(bool.Parse(dataLine));
                                 break;
                             }
+
+                        //v1.49
+
+                        case "driver_flags":
+                            {
+                                driver_flags.Capacity = int.Parse(dataLine);
+                                break;
+                            }
+
+                        case var s when s.StartsWith("driver_flags["):
+                            {
+                                driver_flags.Add(int.Parse(dataLine));
+                                break;
+                            }
+
+                        case "driver_undrivable_truck_timers":
+                            {
+                                driver_undrivable_truck_timers.Capacity = int.Parse(dataLine);
+                                break;
+                            }
+
+                        case var s when s.StartsWith("driver_undrivable_truck_timers["):
+                            {
+                                driver_undrivable_truck_timers.Add(int.Parse(dataLine));
+                                break;
+                            }
+
+                        //v1.49
+
+                        default:
+                            {
+                                UnidentifiedLines.Add(currentLine);
+                                IO_Utilities.ErrorLogWriter(WriteErrorMsg(tagLine, dataLine));
+                                break;
+                            }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Utilities.IO_Utilities.ErrorLogWriter(ex.Message + Environment.NewLine + this.GetType().Name.ToLower() + " | " + tagLine + " = " + dataLine);
-                    break;
+                    IO_Utilities.ErrorLogWriter(WriteErrorMsg(ex.Message, tagLine, dataLine));
+                    continue;
                 }
             }
         }
@@ -421,6 +473,10 @@ namespace TS_SE_Tool.Save.Items
             returnSB.AppendLine(" trailer_placement: " + trailer_placement.ToString());
             returnSB.AppendLine(" slave_trailer_placements: " + slave_trailer_placements.ToString());
             returnSB.AppendLine(" schedule_transfer_to_hq: " + schedule_transfer_to_hq.ToString().ToLower());
+
+            if (_version >= (byte)saveVTV.v147)
+                returnSB.AppendLine(" schedule_quick_travel: " + schedule_quick_travel.ToString().ToLower());
+
             returnSB.AppendLine(" flags: " + flags.ToString());
             returnSB.AppendLine(" gas_pump_money_debt: " + gas_pump_money_debt.ToString());
             returnSB.AppendLine(" current_job: " + current_job);
@@ -447,13 +503,29 @@ namespace TS_SE_Tool.Save.Items
             for (int i = 0; i < drivers.Count; i++)
                 returnSB.AppendLine(" drivers[" + i + "]: " + drivers[i]);
 
+            if (_version >= 71)
+            {
+                returnSB.AppendLine(" driver_flags: " + driver_flags.Count);
+                for (int i = 0; i < driver_flags.Count; i++)
+                    returnSB.AppendLine(" driver_flags[" + i + "]: " + driver_flags[i].ToString());
+            }
+
             returnSB.AppendLine(" driver_readiness_timer: " + driver_readiness_timer.Count);
             for (int i = 0; i < driver_readiness_timer.Count; i++)
                 returnSB.AppendLine(" driver_readiness_timer[" + i + "]: " + driver_readiness_timer[i].ToString());
 
+            if (_version >= 71)
+            {
+                returnSB.AppendLine(" driver_undrivable_truck_timers: " + driver_undrivable_truck_timers.Count);
+                for (int i = 0; i < driver_undrivable_truck_timers.Count; i++)
+                    returnSB.AppendLine(" driver_undrivable_truck_timers[" + i + "]: " + driver_undrivable_truck_timers[i].ToString());
+            }
+
             returnSB.AppendLine(" driver_quit_warned: " + driver_quit_warned.Count);
             for (int i = 0; i < driver_quit_warned.Count; i++)
                 returnSB.AppendLine(" driver_quit_warned[" + i + "]: " + driver_quit_warned[i].ToString().ToLower());
+
+            returnSB.Append(WriteUnidentifiedLines());
 
             returnSB.AppendLine("}");
 

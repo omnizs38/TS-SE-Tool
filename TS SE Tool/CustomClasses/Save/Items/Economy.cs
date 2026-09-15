@@ -29,7 +29,9 @@ namespace TS_SE_Tool.Save.Items
 
         internal SCS_Float game_time_secs { get; set; } = 0;
 
-        internal int game_time_initial { get; set; } = 0;
+        //Savefile v97 writes "nil" here when the game has not stamped an initial game
+        //time yet. Kept as raw text so both that and any number round-trip exactly.
+        internal string game_time_initial { get; set; } = "0";
         internal int achievements_added { get; set; } = 0;
 
         internal bool new_game { get; set; } = false;
@@ -50,16 +52,21 @@ namespace TS_SE_Tool.Save.Items
 
         internal string delivery_log { get; set; } = "";
         internal string ferry_log { get; set; } = "";
+        internal string police_offence_log { get; set; } = "";
 
         internal int stored_camera_mode { get; set; } = 0;
         internal int stored_actor_state { get; set; } = 0;
         internal int stored_high_beam_style { get; set; } = 0;
 
-        internal Vector_2f stored_actor_windows_state { get; set; } = new Vector_2f();
+        internal SCS_Float_2 stored_actor_windows_state { get; set; } = new SCS_Float_2();
 
         internal int stored_actor_wiper_mode { get; set; } = 0;
         internal int stored_actor_retarder { get; set; } = 0;
         internal int stored_display_mode { get; set; } = 0;
+
+        internal int stored_display_mode_on_dashboard { get; set; } = 0;
+        internal int stored_display_mode_on_gps { get; set; } = 0;
+
         internal int stored_dashboard_map_mode { get; set; } = 0;
         internal int stored_world_map_zoom { get; set; } = 0;
         internal int stored_online_job_id { get; set; } = 0;
@@ -132,11 +139,11 @@ namespace TS_SE_Tool.Save.Items
         internal int undamaged_cargo_row { get; set; } = 0;
         internal int service_visit_count { get; set; } = 0;
 
-        internal Vector_3f last_service_pos { get; set; } = new Vector_3f();
+        internal SCS_Float_3 last_service_pos { get; set; } = new SCS_Float_3();
 
         internal int gas_station_visit_count { get; set; } = 0;
 
-        internal Vector_3f last_gas_station_pos { get; set; } = new Vector_3f();
+        internal SCS_Float_3 last_gas_station_pos { get; set; } = new SCS_Float_3();
 
         internal int emergency_call_count { get; set; } = 0;
         internal int ai_crash_count { get; set; } = 0;
@@ -174,7 +181,7 @@ namespace TS_SE_Tool.Save.Items
         internal List<string> bus_stops { get; set; } = new List<string>();
 
         internal string bus_job_log { get; set; } = "";
-        internal List<string> unknown_lines { get; set; } = new List<string>();
+
         internal int bus_experience_points { get; set; } = 0;
         internal int bus_total_distance { get; set; } = 0;
         internal int bus_finished_job_count { get; set; } = 0;
@@ -183,6 +190,12 @@ namespace TS_SE_Tool.Save.Items
         internal int bus_total_stops { get; set; } = 0;
         internal int bus_game_time { get; set; } = 0;
         internal int bus_playing_time { get; set; } = 0;
+
+        //v1.49
+
+        internal string used_vehicle_assortment { get; set; } = "";
+
+        //v1.49
 
         #endregion
 
@@ -195,8 +208,6 @@ namespace TS_SE_Tool.Save.Items
 
             foreach (string currentLine in _input)
             {
-                string originalLine = currentLine;
-
                 if (currentLine.Contains(':'))
                 {
                     string[] splittedLine = currentLine.Split(new char[] { ':' }, 2);
@@ -215,6 +226,8 @@ namespace TS_SE_Tool.Save.Items
                     switch (tagLine)
                     {
                         case "":
+                        case "economy":
+                        case "}":
                             {
                                 break;
                             }
@@ -305,7 +318,7 @@ namespace TS_SE_Tool.Save.Items
 
                         case "game_time_initial":
                             {
-                                game_time_initial = int.Parse(dataLine);
+                                game_time_initial = dataLine;
                                 break;
                             }
 
@@ -393,6 +406,12 @@ namespace TS_SE_Tool.Save.Items
                                 break;
                             }
 
+                        case "police_offence_log":
+                            {
+                                police_offence_log = dataLine;
+                                break;
+                            }
+
                         case "stored_camera_mode":
                             {
                                 stored_camera_mode = int.Parse(dataLine);
@@ -413,7 +432,7 @@ namespace TS_SE_Tool.Save.Items
 
                         case "stored_actor_windows_state":
                             {
-                                stored_actor_windows_state = new Vector_2f(dataLine);
+                                stored_actor_windows_state = new SCS_Float_2(dataLine);
                                 break;
                             }
 
@@ -432,6 +451,18 @@ namespace TS_SE_Tool.Save.Items
                         case "stored_display_mode":
                             {
                                 stored_display_mode = int.Parse(dataLine);
+                                break;
+                            }
+
+                        case "stored_display_mode_on_dashboard":
+                            {
+                                stored_display_mode_on_dashboard = int.Parse(dataLine);
+                                break;
+                            }
+
+                        case "stored_display_mode_on_gps":
+                            {
+                                stored_display_mode_on_gps = int.Parse(dataLine);
                                 break;
                             }
 
@@ -827,7 +858,7 @@ namespace TS_SE_Tool.Save.Items
 
                         case "last_service_pos":
                             {
-                                last_service_pos = new Vector_3f(dataLine);
+                                last_service_pos = new SCS_Float_3(dataLine);
                                 break;
                             }
 
@@ -839,7 +870,7 @@ namespace TS_SE_Tool.Save.Items
 
                         case "last_gas_station_pos":
                             {
-                                last_gas_station_pos = new Vector_3f(dataLine);
+                                last_gas_station_pos = new SCS_Float_3(dataLine);
                                 break;
                             }
 
@@ -1070,19 +1101,31 @@ namespace TS_SE_Tool.Save.Items
                                 bus_playing_time = int.Parse(dataLine);
                                 break;
                             }
-                            default:
+
+                        //v1.49
+
+                        case "used_vehicle_assortment":
                             {
-                                if(!string.IsNullOrWhiteSpace(originalLine) && originalLine.Trim() != "{" && originalLine.Trim() != "}")
-                                unknown_lines.Add(originalLine);
+                                used_vehicle_assortment = dataLine;
+                                break;
+                            }
+
+                        //v1.49
+
+                        default:
+                            {
+                                UnidentifiedLines.Add(currentLine);
+                                IO_Utilities.ErrorLogWriter(WriteErrorMsg(tagLine, dataLine));
                                 break;
                             }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Utilities.IO_Utilities.ErrorLogWriter(ex.Message + Environment.NewLine + this.GetType().Name.ToLower() + " | " + tagLine + " = " + dataLine);
-                    break;
+                    IO_Utilities.ErrorLogWriter(WriteErrorMsg(ex.Message, tagLine, dataLine));
+                    continue;
                 }
+
                 //Populate helping variables
                 setPlayerSkillsArray();
             }
@@ -1130,7 +1173,7 @@ namespace TS_SE_Tool.Save.Items
             returnSB.AppendLine(" game_time: " + game_time.ToString());
             returnSB.AppendLine(" game_time_secs: " + game_time_secs.ToString());
 
-            returnSB.AppendLine(" game_time_initial: " + game_time_initial.ToString());
+            returnSB.AppendLine(" game_time_initial: " + game_time_initial);
 
             returnSB.AppendLine(" achievements_added: " + achievements_added.ToString());
 
@@ -1154,6 +1197,9 @@ namespace TS_SE_Tool.Save.Items
             returnSB.AppendLine(" delivery_log: " + delivery_log);
             returnSB.AppendLine(" ferry_log: " + ferry_log);
 
+            if (_version >= (byte)saveVTV.v147)
+                returnSB.AppendLine(" police_offence_log: " + police_offence_log);
+
             returnSB.AppendLine(" stored_camera_mode: " + stored_camera_mode.ToString());
             returnSB.AppendLine(" stored_actor_state: " + stored_actor_state.ToString());
             returnSB.AppendLine(" stored_high_beam_style: " + stored_high_beam_style.ToString());
@@ -1161,7 +1207,15 @@ namespace TS_SE_Tool.Save.Items
             returnSB.AppendLine(" stored_actor_wiper_mode: " + stored_actor_wiper_mode.ToString());
             returnSB.AppendLine(" stored_actor_retarder: " + stored_actor_retarder.ToString());
 
-            returnSB.AppendLine(" stored_display_mode: " + stored_display_mode.ToString());
+            if (_version < (byte)saveVTV.v146)
+                returnSB.AppendLine(" stored_display_mode: " + stored_display_mode.ToString());
+
+            if (_version >= (byte)saveVTV.v146)
+            {
+                returnSB.AppendLine(" stored_display_mode_on_dashboard: " + stored_display_mode_on_dashboard.ToString());
+                returnSB.AppendLine(" stored_display_mode_on_gps: " + stored_display_mode_on_gps.ToString());
+            }
+
             returnSB.AppendLine(" stored_dashboard_map_mode: " + stored_dashboard_map_mode.ToString());
             returnSB.AppendLine(" stored_world_map_zoom: " + stored_world_map_zoom.ToString());
 
@@ -1310,6 +1364,11 @@ namespace TS_SE_Tool.Save.Items
             for (int i = 0; i < drivers_offer.Count; i++)
                 returnSB.AppendLine(" drivers_offer[" + i + "]: " + drivers_offer[i]);
 
+            if (_version > (byte)saveVTV.v148)
+            {
+                returnSB.AppendLine(" used_vehicle_assortment: " + used_vehicle_assortment);
+            }
+
             returnSB.AppendLine(" freelance_truck_offer: " + freelance_truck_offer);
 
             returnSB.AppendLine(" trucks_bought_online: " + trucks_bought_online.ToString());
@@ -1352,8 +1411,7 @@ namespace TS_SE_Tool.Save.Items
             returnSB.AppendLine(" bus_game_time: " + bus_game_time.ToString());
             returnSB.AppendLine(" bus_playing_time: " + bus_playing_time.ToString());
 
-            for(int i = 0; i < unknown_lines.Count; i++)
-                returnSB.AppendLine(unknown_lines[i]);
+            returnSB.Append(WriteUnidentifiedLines());
 
             returnSB.AppendLine("}");
 
@@ -1432,6 +1490,5 @@ namespace TS_SE_Tool.Save.Items
 
             experience_points = experience;
         }
-
     }
 }

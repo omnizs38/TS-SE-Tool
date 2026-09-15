@@ -22,6 +22,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using System.Threading;
 
 namespace TS_SE_Tool
 {
@@ -218,8 +219,9 @@ namespace TS_SE_Tool
 
         internal Image freightMarketGetCompanyIcon(string _companyName, Brush _brush)
         {
-            if (File.Exists(@"img\" + GameType + @"\companies\" + _companyName + ".dds"))
-                return ExtImgLoader(new string[] { @"img\" + GameType + @"\companies\" + _companyName + ".dds" }, 100, 32, 0, 0)[0];
+            string filepath = @"img\" + GameType + @"\companies\" + _companyName + ".dds";
+            if (File.Exists(filepath))
+                return Utilities.Graphics_TSSET.ddsImgLoader(filepath, 100, 32).images[0];
             else
             {
                 string currentDirName = Directory.GetCurrentDirectory() + @"\img\" + GameType + @"\companies";
@@ -227,7 +229,7 @@ namespace TS_SE_Tool
                 string[] files = Directory.GetFiles(currentDirName, searchpattern);
 
                 if (files.Length > 0)
-                    return ExtImgLoader(new string[] { files[0] }, 100, 32, 0, 0)[0];
+                    return Utilities.Graphics_TSSET.ddsImgLoader(files[0], 100, 32).images[0];
                 else                
                     return freightMarketDrawCompanyIconAsText(_companyName, 100, 32, _brush, 12);                
             }
@@ -273,10 +275,14 @@ namespace TS_SE_Tool
             //Country name translated
             if (countryName != "")
             {
+                textToWrite = "(";
+
                 if (CountriesDataList.ContainsKey(countryName))                
-                    textToWrite = "(" + CountriesDataList[countryName].ShortName + ")";                
+                    textToWrite += CountriesDataList[countryName].ShortName;                
                 else                
-                    textToWrite = "(" + countryName.First() + ")";
+                    textToWrite += countryName.First();
+
+                textToWrite += ")";
 
                 countryNameWidth = Convert.ToInt32(e.Graphics.MeasureString(textToWrite, BoldFont).Width);
 
@@ -793,30 +799,25 @@ namespace TS_SE_Tool
             dc = new DataColumn("CargoName", typeof(string));
             combDT.Columns.Add(dc);
 
-            foreach (Cargo tempitem in CargoesList)
+            foreach (Cargo Item in CargoesList)
             {
-                if (CargoLngDict.TryGetValue(tempitem.CargoName, out string value))
-                {
-                    if (value != null && value != "")
-                    {
-                        string str = tempitem.CargoName;
+                string strName = Item.CargoName;
+                string сapName = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(strName.Replace('_', ' '));
 
-                        combDT.Rows.Add(str, value);
+                if (CargoLngDict.TryGetValue(Item.CargoName, out string trName))
+                {
+                    if (trName != null && trName != "")
+                    {
+                        combDT.Rows.Add(strName, trName);
                     }
                     else
                     {
-                        string str = tempitem.CargoName;
-                        string CapName = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(str);
-
-                        combDT.Rows.Add(str, CapName);
+                        combDT.Rows.Add(strName, сapName + " -nt");
                     }
                 }
                 else
                 {
-                    string str = tempitem.CargoName;
-                    string CapName = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(str);
-
-                    combDT.Rows.Add(str, CapName);
+                    combDT.Rows.Add(strName, сapName + " -new");
                 }
             }
 
@@ -837,8 +838,7 @@ namespace TS_SE_Tool
             if (e.Index < 0)
                 return;
 
-            //if ((e.State & DrawItemState.ComboBoxEdit) == DrawItemState.ComboBoxEdit)
-            //    return;
+            CultureInfo ci = Thread.CurrentThread.CurrentUICulture;
 
             ComboBox lst = sender as ComboBox;
 
@@ -862,7 +862,7 @@ namespace TS_SE_Tool
                 CargoDN = lst.GetItemText(lst.Items[e.Index]);
 
             if (CargoName.EndsWith("_c"))
-                CargoDN += " (Cont)";
+                CargoDN += " " + ResourceManagerMain.GetPlainString("CargoContainer", ci); ;
 
             string txt = CargoDN;
 
@@ -1093,17 +1093,18 @@ namespace TS_SE_Tool
 
             foreach (TrailerDefinition tempitem in TempCargo.TrailerDefList)
             {
-                string value = null;
+                string translatedCargoName = null;
 
-                CargoLngDict.TryGetValue(tempitem.DefName, out value);
+                CargoLngDict.TryGetValue(tempitem.DefName, out translatedCargoName);
+                string CapName = "";
 
-                if (value != null && value != "")
+                if (translatedCargoName != null && translatedCargoName != "")
                 {
-                    combDT.Rows.Add(tempitem.DefName, value + " (" + tempitem.UnitsCount + "u)", tempitem.CargoType, tempitem.UnitsCount);
-                }
+                    CapName = translatedCargoName;
+                }   
                 else
                 {
-                    string CapName = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(tempitem.DefName);
+                    CapName = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(tempitem.DefName);
                     string[] CapNameArray = CapName.Split(new char[] { '.' });
 
                     CapName = "";
@@ -1111,9 +1112,11 @@ namespace TS_SE_Tool
                     {
                         CapName += CapNameArray[i] + " ";
                     }
+                }
 
-
-                    combDT.Rows.Add(tempitem.DefName, CapName + "(" + tempitem.UnitsCount + "u)", tempitem.CargoType, tempitem.UnitsCount);
+                foreach (CargoLoadVariants cargoVar in tempitem.CargoLoadVariants)
+                {
+                    combDT.Rows.Add(tempitem.DefName, CapName + "(" + cargoVar.UnitsCount + "u)", tempitem.CargoType, cargoVar.UnitsCount);
                 }
             }
 
@@ -1426,8 +1429,8 @@ namespace TS_SE_Tool
             AddedJobsDictionary.Clear();
 
             listBoxFreightMarketAddedJobs.Items.Clear();
-            labelFreightMarketDistanceNumbers.Text = " - ";// + ProgSettingsV.DistanceMes;
-            buttonFreightMarketClearJobList.Enabled = false;
+
+            RefreshFreightMarketDistance();
         }
 
         private void checkBoxRandomDest_CheckedChanged(object sender, EventArgs e)
@@ -1494,10 +1497,13 @@ namespace TS_SE_Tool
 
                 //True Distance
                 int TrueDistance = (int)(int.Parse(distance) * ProgSettingsV.TimeMultiplier);
+                bool _realDistance = true;
 
                 if (distance == "11111")
                 {
                     TrueDistance = (int)(5 * ProgSettingsV.TimeMultiplier);
+                    _realDistance = false;
+
                     unCertainRouteLength = "*";
                 }
                 //Time untill job expires
@@ -1506,7 +1512,7 @@ namespace TS_SE_Tool
 
                 //Creating Job data
                 JobAdded tempJobData = new JobAdded(SourceCity, SourceCompany, DestinationCity, DestinationCompany, Cargo, int.Parse(Urgency), CargoType,
-                    UnitsCount, TrueDistance, int.Parse(FerryTime), int.Parse(FerryPrice), ExpirationTime, TruckName, TrailerVariant, TrailerDefinition);
+                    UnitsCount, TrueDistance, int.Parse(FerryTime), int.Parse(FerryPrice), ExpirationTime, TruckName, TrailerVariant, TrailerDefinition, _realDistance);
 
                 //Settign start point for loopback route
                 if (JobsAmountAdded == 0)
@@ -1595,7 +1601,9 @@ namespace TS_SE_Tool
 
                     if (e.Y < rect.Bottom)
                     {
-                        contextMenuStripFreightMarketJobList.Show(listBoxFreightMarketAddedJobs, e.Location);
+                        contextMenuStripMainStateChange("FreightMarketCargoList");
+
+                        contextMenuStripMain.Show(listBoxFreightMarketAddedJobs, e.Location);
                         int index = listBoxFreightMarketAddedJobs.IndexFromPoint(e.Location);
                         listBoxFreightMarketAddedJobs.SelectedIndex = index;
                     }
@@ -1685,6 +1693,9 @@ namespace TS_SE_Tool
                 foreach (JobAdded tmpItem in listBoxFreightMarketAddedJobs.Items)
                 {
                     JobsTotalDistance += tmpItem.Distance;
+
+                    if (!tmpItem.realDistance)
+                        unCertainRouteLength = "*";
                 }
 
                 labelFreightMarketDistanceNumbers.Text = Math.Floor(JobsTotalDistance * DistanceMultiplier).ToString() + unCertainRouteLength + " " + ProgSettingsV.DistanceMes;

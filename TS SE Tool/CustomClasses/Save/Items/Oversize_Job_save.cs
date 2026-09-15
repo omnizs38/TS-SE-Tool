@@ -5,13 +5,17 @@ using System.Text;
 using System.Threading.Tasks;
 
 using TS_SE_Tool.Save.DataFormat;
+using TS_SE_Tool.Utilities;
 
 namespace TS_SE_Tool.Save.Items
 {
     class Oversize_Job_save : SiiNBlockCore
     {
-        internal Vector_3f front_escort_ws_position { get; set; } = new Vector_3f();
-        internal Vector_3f back_escort_ws_position { get; set; } = new Vector_3f();
+
+        #region variables
+
+        internal SCS_Float_3 front_escort_ws_position { get; set; } = new SCS_Float_3();
+        internal SCS_Float_3 back_escort_ws_position { get; set; } = new SCS_Float_3();
 
         
         internal UInt64? front_trajectory_uid { get; set; } = 0;
@@ -24,9 +28,9 @@ namespace TS_SE_Tool.Save.Items
         internal SCS_Float back_trajectory_position { get; set; } = 0;
 
         
-        internal Vector_4f front_escort_rotation { get; set; } = new Vector_4f();
+        internal SCS_Quaternion front_escort_rotation { get; set; } = new SCS_Quaternion();
 
-        internal Vector_4f back_escort_rotation { get; set; } = new Vector_4f();
+        internal SCS_Quaternion back_escort_rotation { get; set; } = new SCS_Quaternion();
 
         
         internal SCS_Float front_escort_speed { get; set; } = 0;
@@ -43,7 +47,7 @@ namespace TS_SE_Tool.Save.Items
         internal int oversize_manager_state { get; set; } = 0;
         internal int? oversize_manager_current_kdop_idx { get; set; } = 0;
 
-        internal Vector_3f oversize_manager_last_valid_pos { get; set; } = new Vector_3f();
+        internal SCS_Float_3 oversize_manager_last_valid_pos { get; set; } = new SCS_Float_3();
 
         internal List<string> active_blocks_rules { get; set; } = new List<string>();
 
@@ -56,6 +60,8 @@ namespace TS_SE_Tool.Save.Items
         internal List<int> map_route_hash { get; set; } = new List<int>();
 
         internal string offer { get; set; } = "";
+
+        #endregion
 
         internal Oversize_Job_save()
         { }
@@ -78,24 +84,27 @@ namespace TS_SE_Tool.Save.Items
                     tagLine = currentLine.Trim();
                     dataLine = "";
                 }
+
                 try
                 {
                     switch (tagLine)
                     {
                         case "":
+                        case "oversize_job_save":
+                        case "}":
                             {
                                 break;
                             }
 
                         case "front_escort_ws_position":
                             {
-                                front_escort_ws_position = new Vector_3f(dataLine);
+                                front_escort_ws_position = new SCS_Float_3(dataLine);
                                 break;
                             }
 
                         case "back_escort_ws_position":
                             {
-                                back_escort_ws_position = new Vector_3f(dataLine);
+                                back_escort_ws_position = new SCS_Float_3(dataLine);
                                 break;
                             }
 
@@ -125,13 +134,13 @@ namespace TS_SE_Tool.Save.Items
 
                         case "front_escort_rotation":
                             {
-                                front_escort_rotation = new Vector_4f(dataLine);
+                                front_escort_rotation = new SCS_Quaternion(dataLine);
                                 break;
                             }
 
                         case "back_escort_rotation":
                             {
-                                back_escort_rotation = new Vector_4f(dataLine);
+                                back_escort_rotation = new SCS_Quaternion(dataLine);
                                 break;
                             }
 
@@ -191,7 +200,7 @@ namespace TS_SE_Tool.Save.Items
 
                         case "oversize_manager_last_valid_pos":
                             {
-                                oversize_manager_last_valid_pos = new Vector_3f(dataLine);
+                                oversize_manager_last_valid_pos = new SCS_Float_3(dataLine);
                                 break;
                             }
 
@@ -249,12 +258,18 @@ namespace TS_SE_Tool.Save.Items
                                 break;
                             }
 
+                        default:
+                            {
+                                UnidentifiedLines.Add(currentLine);
+                                IO_Utilities.ErrorLogWriter(WriteErrorMsg(tagLine, dataLine));
+                                break;
+                            }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Utilities.IO_Utilities.ErrorLogWriter(ex.Message + Environment.NewLine + this.GetType().Name.ToLower() + " | " + tagLine + " = " + dataLine);
-                    break;
+                    IO_Utilities.ErrorLogWriter(WriteErrorMsg(ex.Message, tagLine, dataLine));
+                    continue;
                 }
             }
         }
@@ -316,6 +331,8 @@ namespace TS_SE_Tool.Save.Items
                 returnSB.AppendLine(" map_route_hash[" + i + "]: " + map_route_hash[i].ToString());
 
             returnSB.AppendLine(" offer: " + offer.ToString());
+
+            returnSB.Append(WriteUnidentifiedLines());
 
             returnSB.AppendLine("}");
 

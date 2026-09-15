@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <WarningLevel>4</WarningLevel>
+    <Deterministic>true</Deterministic>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/omnizs38/TS-SE-Tool</RepositoryUrl>
+    <Authors>omnizs38 and contributors</Authors>
+    <Company>omnizs38</Company>
+  </PropertyGroup>
+</Project>

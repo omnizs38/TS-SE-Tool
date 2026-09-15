@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using TS_SE_Tool.Save.DataFormat;
+using TS_SE_Tool.Utilities;
 
 namespace TS_SE_Tool.Save.Items
 {
@@ -60,6 +61,8 @@ namespace TS_SE_Tool.Save.Items
                     switch (tagLine)
                     {
                         case "":
+                        case "trailer_def":
+                        case "}":
                             {
                                 break;
                             }
@@ -147,12 +150,19 @@ namespace TS_SE_Tool.Save.Items
                                 source_name = dataLine;
                                 break;
                             }
+
+                        default:
+                            {
+                                UnidentifiedLines.Add(currentLine);
+                                IO_Utilities.ErrorLogWriter(WriteErrorMsg(tagLine, dataLine));
+                                break;
+                            }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Utilities.IO_Utilities.ErrorLogWriter(ex.Message + Environment.NewLine + this.GetType().Name.ToLower() + " | " + tagLine + " = " + dataLine);
-                    break;
+                    IO_Utilities.ErrorLogWriter(WriteErrorMsg(ex.Message, tagLine, dataLine));
+                    continue;
                 }
             }
         }
@@ -190,6 +200,8 @@ namespace TS_SE_Tool.Save.Items
             returnSB.AppendLine(" length: " + length.ToString());
 
             returnSB.AppendLine(" source_name: " + source_name);
+
+            returnSB.Append(WriteUnidentifiedLines());
 
             returnSB.AppendLine("}");
 

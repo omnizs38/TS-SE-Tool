@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TS_SE_Tool.Utilities;
 
 namespace TS_SE_Tool.Save.Items
 {
@@ -37,11 +38,14 @@ namespace TS_SE_Tool.Save.Items
                     tagLine = currentLine.Trim();
                     dataLine = "";
                 }
+
                 try
                 {
                     switch (tagLine)
                     {
                         case "":
+                        case "ferry_log_entry":
+                        case "}":
                             {
                                 break;
                             }
@@ -69,12 +73,19 @@ namespace TS_SE_Tool.Save.Items
                                 use_count = uint.Parse(dataLine);
                                 break;
                             }
+
+                        default:
+                            {
+                                UnidentifiedLines.Add(currentLine);
+                                IO_Utilities.ErrorLogWriter(WriteErrorMsg(tagLine, dataLine));
+                                break;
+                            }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Utilities.IO_Utilities.ErrorLogWriter(ex.Message + Environment.NewLine + this.GetType().Name.ToLower() + " | " + tagLine + " = " + dataLine);
-                    break;
+                    IO_Utilities.ErrorLogWriter(WriteErrorMsg(ex.Message, tagLine, dataLine));
+                    continue;
                 }
             }
         }
@@ -92,6 +103,8 @@ namespace TS_SE_Tool.Save.Items
 
             returnSB.AppendLine(" last_visit: " + last_visit.ToString());
             returnSB.AppendLine(" use_count: " + use_count.ToString());
+
+            returnSB.Append(WriteUnidentifiedLines());
 
             returnSB.AppendLine("}");
 

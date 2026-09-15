@@ -37,6 +37,9 @@ namespace TS_SE_Tool
         public bool IgnoreStatus { get; set; } = true;
 
         private FormMain MainForm = Application.OpenForms.OfType<FormMain>().Single();
+        
+        public Garages()
+        { }
 
         public Garages(string _GarageName)
         {
@@ -51,39 +54,62 @@ namespace TS_SE_Tool
 
         public string GetStatusString()
         {
-            string output = "", status = "", statusStr = "";
+            string status = "", statusStr = "";
 
-            if (GarageStatus == 0)
+            switch (GarageStatus)
             {
-                statusStr = "Not owned";
-            }
-            else if (GarageStatus == 2)
-            {
-                statusStr = "Small";
-            }
-            else if (GarageStatus == 3)
-            {
-                statusStr = "Large";
-            }
-            else if (GarageStatus == 6)
-            {
-                statusStr = "Tiny";
+                case 0:
+                    {
+                        statusStr = "Not owned";
+                        break;
+                    }
+                case 2:
+                    {
+                        statusStr = "Small";
+                        break;
+                    }
+                case 3:
+                    {
+                        statusStr = "Large";
+                        break;
+                    }
+                case 6:
+                    {
+                        statusStr = "Tiny";
+                        break;
+                    }
             }
 
-            status = MainForm.ResourceManagerMain.GetString(statusStr, Thread.CurrentThread.CurrentUICulture);
+            status = MainForm.ResourceManagerMain.GetPlainString(statusStr, Thread.CurrentThread.CurrentUICulture);
 
-            if (status != null && status != "")
-                output = status;
-            else            
-                output = statusStr;            
+            if (string.IsNullOrEmpty(status))
+                status = statusStr;     
 
-            return output;
+            return status;
         }
 
 
         public override string ToString()
         {
-            return GarageName + " | D:" + Drivers.Count + "| V:" + Vehicles.Count;
+            return GarageName + " | D: [ " + Drivers.Where(x => x != null).Count() + " | " + Drivers.Count + " ]" +
+                                " | V: [ " + Vehicles.Where(x => x != null).Count() + " | " + Vehicles.Count + " ]";
+        }
+
+        public Garages DeepClone()
+        {
+            Garages cloneObj = new Garages();
+
+            cloneObj.GarageName = this.GarageName;
+            cloneObj.GarageNameTranslated = this.GarageNameTranslated;
+
+            cloneObj.GarageStatus = this.GarageStatus;
+
+            cloneObj.Vehicles = new List<string>(this.Vehicles);
+            cloneObj.Drivers = new List<string>(this.Drivers);
+            cloneObj.Trailers = new List<string>(this.Trailers);
+            cloneObj.IgnoreStatus = this.IgnoreStatus;
+
+            return cloneObj;
         }
     }
 }
