@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using TS_SE_Tool.Save.DataFormat;
+using TS_SE_Tool.Utilities;
 
 namespace TS_SE_Tool.Save.Items
 {
@@ -14,7 +15,7 @@ namespace TS_SE_Tool.Save.Items
 
         internal string delivered_trailer { get; set; } = "";
 
-        internal List<Vector_3f> delivered_pos { get; set; } = new List<Vector_3f>();
+        internal List<SCS_Placement> delivered_pos { get; set; } = new List<SCS_Placement>();
 
         internal List<string> job_offer { get; set; } = new List<string>();
 
@@ -24,6 +25,9 @@ namespace TS_SE_Tool.Save.Items
 
         internal int? reserved_trailer_slot { get; set; } = null;
 
+        internal uint state { get; set; } = 0;
+
+        internal uint state_change_time { get; set; } = 0;
 
         internal Company()
         { }
@@ -46,11 +50,14 @@ namespace TS_SE_Tool.Save.Items
                     tagLine = currentLine.Trim();
                     dataLine = "";
                 }
+
                 try
                 {
                     switch (tagLine)
                     {
                         case "":
+                        case "company":
+                        case "}":
                             {
                                 break;
                             }
@@ -75,7 +82,7 @@ namespace TS_SE_Tool.Save.Items
 
                         case var s when s.StartsWith("delivered_pos["):
                             {
-                                delivered_pos.Add(new Vector_3f(dataLine));
+                                delivered_pos.Add(new SCS_Placement(dataLine));
                                 break;
                             }
 
@@ -115,12 +122,30 @@ namespace TS_SE_Tool.Save.Items
                                 break;
                             }
 
+                        case "state":
+                            {
+                                state = uint.Parse(dataLine);
+                                break;
+                            }
+
+                        case "state_change_time":
+                            {
+                                state_change_time = uint.Parse(dataLine);
+                                break;
+                            }
+
+                        default:
+                            {
+                                UnidentifiedLines.Add(currentLine);
+                                IO_Utilities.ErrorLogWriter(WriteErrorMsg(tagLine, dataLine));
+                                break;
+                            }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Utilities.IO_Utilities.ErrorLogWriter(ex.Message + Environment.NewLine + this.GetType().Name.ToLower() + " | " + tagLine + " = " + dataLine);
-                    break;
+                    IO_Utilities.ErrorLogWriter(WriteErrorMsg(ex.Message, tagLine, dataLine));
+                    continue;
                 }
             }
         }
@@ -152,6 +177,14 @@ namespace TS_SE_Tool.Save.Items
             returnSB.AppendLine(" discovered: " + discovered.ToString().ToLower());
 
             returnSB.AppendLine(" reserved_trailer_slot: " + (reserved_trailer_slot == null ? "nil" : reserved_trailer_slot.ToString()));
+
+            if (_version >= (byte)saveVTV.v146)
+            {
+                returnSB.AppendLine(" state: " + state.ToString());
+                returnSB.AppendLine(" state_change_time: " + state_change_time.ToString());
+            }
+
+            returnSB.Append(WriteUnidentifiedLines());
 
             returnSB.AppendLine("}");
 

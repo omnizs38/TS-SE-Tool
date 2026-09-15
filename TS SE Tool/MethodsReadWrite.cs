@@ -30,13 +30,31 @@ using System.Reflection;
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
+
 using TS_SE_Tool.Utilities;
 
 namespace TS_SE_Tool
 {
     public partial class FormMain : Form
     {
-        private BackgroundWorker worker;
+        private BackgroundWorker generalWorker;
+
+        //Check if tsset folders exist
+        private void CheckTssetFoldersExist()
+        {
+            TssetFoldersExist = true;
+
+            string[] folderPaths = new string[] { "libs", "img", "lang", "updater" };
+
+            foreach (string path in folderPaths)
+            {
+                if (!Directory.Exists(path))
+                {
+                    TssetFoldersExist = false;
+                    break;
+                }
+            }
+        }
 
         private void LoadExtCountries()
         {
@@ -109,10 +127,12 @@ namespace TS_SE_Tool
         private void LngFileLoader(string _sourcefile, Dictionary<string,string> _destDict, string _ci)
         {
             _destDict.Clear();
+            bool defaultDuplicates = false;
+            string defaultFile = Directory.GetCurrentDirectory() + @"\lang\Default\" + _sourcefile;
 
             try
             {
-                string[] tempFile = File.ReadAllLines(Directory.GetCurrentDirectory() + @"\lang\Default\" + _sourcefile);
+                string[] tempFile = File.ReadAllLines(defaultFile);
 
                 for (int i = 0; i < tempFile.Length; i++)
                 {
@@ -127,9 +147,13 @@ namespace TS_SE_Tool
                         { }
 
                         if (tmp[0] != "")
-                            _destDict.Add(tmp[0], tmp[1]);
+                        {
+                            if (!_destDict.ContainsKey(tmp[0]))
+                                _destDict.Add(tmp[0], tmp[1]);
+                            else
+                                defaultDuplicates = true;
+                        }
                     }
-                        
                 }
             }
             catch
@@ -137,17 +161,25 @@ namespace TS_SE_Tool
                 IO_Utilities.LogWriter(_sourcefile + " file is missing");
             }
 
-            string language = "";
+            if (defaultDuplicates)
+            {
+                var txtToWrite = _destDict.Select(x => string.Join(";", new string[] { x.Key, x.Value })).ToList();
+                txtToWrite.Insert(0, "[Default]");
+
+                File.WriteAllLines(defaultFile, txtToWrite, Encoding.UTF8);
+            }
+
+            string languageFile = "";
 
             if (_ci != "Default")
-                language = _ci += "\\";
+                languageFile = _ci += "\\" + _sourcefile;
 
-            if (!File.Exists(Directory.GetCurrentDirectory() + @"\lang\" + language + _sourcefile))
+            if (!File.Exists(Directory.GetCurrentDirectory() + @"\lang\" + languageFile))
                 return;
 
             try
             {
-                string[] tempFile = File.ReadAllLines(Directory.GetCurrentDirectory() + @"\lang\" + language + _sourcefile);
+                string[] tempFile = File.ReadAllLines(Directory.GetCurrentDirectory() + @"\lang\" + languageFile);
 
                 for (int i = 0; i < tempFile.Length; i++)
                 {
@@ -222,177 +254,155 @@ namespace TS_SE_Tool
 
         private void LoadExtImages()
         {
-            string[] imgpaths;
+            string[] imgNames, imgPaths;
 
-            string[] imgNames = new string[] { "Language", "github", "SCS", "TMP", "PDF", "YouTube", "ProgramSettings", "Settings", "Cross", "Info", "Download", "Question", "NetworkCloud", "Reload", "EditList" };
-            imgpaths = new string[] { @"img\UI\globe.png", @"img\UI\github.png", @"img\UI\SCS.png", @"img\UI\TMP.png", @"img\UI\PDF.png", @"img\UI\YouTube.png", @"img\UI\pSettings.png", @"img\UI\cogwheel.png",
-                                    @"img\UI\quit.png", @"img\UI\info.png", @"img\UI\download.png", @"img\UI\question.png", @"img\UI\networkCloud.png", @"img\UI\reload.png", @"img\UI\edit.png"};
+            //=== UI images
 
-            for(int i = 0; i < imgpaths.Length; i++)
-            {
-                ProgUIImgsDict.Add(imgNames[i], Bitmap.FromFile(imgpaths[i]));
-            }
+            imgNames = new string[] { "Language", "github", "SCS", "TMP", "PDF", "YouTube", 
+                                        "ProgramSettings", "Settings", "Cross", "Info", "Download",
+                                        "Question", "NetworkCloud", "Reload", "EditList",
+                                        "Extract"};
 
-            MemoryStream ms = new MemoryStream();
-            ImageFromDDS(@"img\service_ico.dds").Save(ms, ImageFormat.Png);
-            RepairImg = Image.FromStream(ms);
-            ms.Dispose();
+            imgPaths = new string[] { @"img\UI\globe.png", @"img\UI\github.png", @"img\UI\SCS.png", @"img\UI\TMP.png", @"img\UI\PDF.png", @"img\UI\YouTube.png",
+                                        @"img\UI\pSettings.png", @"img\UI\cogwheel.png", @"img\UI\quit.png", @"img\UI\info.png", @"img\UI\download.png",
+                                        @"img\UI\question.png", @"img\UI\networkCloud.png", @"img\UI\reload.png", @"img\UI\edit.png",
+                                        @"img\UI\extract.png"};
 
-            ms = new MemoryStream();
-            ImageFromDDS(@"img\gas_ico.dds").Save(ms, ImageFormat.Png);
-            RefuelImg = Image.FromStream(ms);
-            ms.Dispose();
+            Image[] tmpArray = Graphics_TSSET.ImgFromFileLoader(imgPaths);
 
-            ms = new MemoryStream();
-            ImageFromDDS(@"img\customize_p.dds").Save(ms, ImageFormat.Png);
-            CustomizeImg = Image.FromStream(ms);
-            ms.Dispose();
+            for (int i = 0; i < imgPaths.Length; i++)
+                ProgUIImgsDict.Add(imgNames[i], tmpArray[i]);
 
-            imgpaths = new string[] { @"img\" + GameType + @"\adr_1.dds", @"img\" + GameType + @"\adr_2.dds", @"img\" + GameType + @"\adr_3.dds", @"img\" + GameType + @"\adr_4.dds", @"img\" + GameType + @"\adr_6.dds", @"img\" + GameType + @"\adr_8.dds" };
-            ADRImgS = ExtImgLoader(imgpaths, 46, 46, 9, 9, 32, 32);
+            imgNames = new string[] { "plus", "minus" };
+            imgPaths = new string[] { @"img\UI\add.dds", @"img\UI\remove.dds"};
 
-            imgpaths = new string[] { @"img\" + GameType + @"\adr_1_grey.dds", @"img\" + GameType + @"\adr_2_grey.dds", @"img\" + GameType + @"\adr_3_grey.dds", @"img\" + GameType + @"\adr_4_grey.dds", @"img\" + GameType + @"\adr_6_grey.dds", @"img\" + GameType + @"\adr_8_grey.dds" };
-            ADRImgSGrey = ExtImgLoader(imgpaths, 46, 46, 9, 9, 32, 32);
+            tmpArray = Graphics_TSSET.ddsImgLoader(imgPaths, 32, 32).images;
 
-            imgpaths = new string[] { @"img\skill_bar_s.dds", @"img\skill_bar_s2.dds", @"img\skill_bar1.dds", @"img\skill_bar2.dds", @"img\skill_bar3.dds" };
+            for (int i = 0; i < imgPaths.Length; i++)
+                ProgUIImgsDict.Add(imgNames[i], tmpArray[i]);
+            
+
+            //=== Game Icons
+
+            imgPaths = new string[] { @"img\ETS2\game_n.dds", @"img\ATS\game_n.dds" };
+            GameIconeImg = Graphics_TSSET.ddsImgLoader(imgPaths, 32, 32).images;
+
+            //=== Main icons
+
+            imgPaths = new string[] { @"img\UI\unknown.dds" };
+            MainIcons = Graphics_TSSET.ddsImgLoader(imgPaths, 95, 95).images;
+
+            //=== Tab page icons
+
+            imgPaths = new string[] { @"img\UI\MainTabs\profiles.dds", @"img\UI\MainTabs\comp_man.dds", @"img\UI\MainTabs\truck_service.dds", @"img\UI\MainTabs\trailers.dds",
+                                      @"img\UI\MainTabs\company_job.dds", @"img\UI\MainTabs\cargo_market.dds", @"img\UI\MainTabs\maps.dds" };
+            TabpagesImages.Images.AddRange(Graphics_TSSET.ddsImgLoader(imgPaths, 64, 64, 64, 0).images);
+
+            //=== Profile
+
+            // skill icons
+            imgPaths = new string[] { @"img\UI\Profile\skill_adr.dds", @"img\UI\Profile\skill_distance.dds", @"img\UI\Profile\skill_heavy.dds", @"img\UI\Profile\skill_fragile.dds",
+                                      @"img\UI\Profile\skill_jit.dds", @"img\UI\Profile\skill_mechanical.dds" };
+            SkillImgS = Graphics_TSSET.ddsImgLoader(imgPaths, 64, 64).images;
+
+            // ADR icons
+            imgPaths = new string[] { @"img\" + GameType + @"\adr_1.dds", @"img\" + GameType + @"\adr_2.dds", @"img\" + GameType + @"\adr_3.dds", 
+                                      @"img\" + GameType + @"\adr_4.dds", @"img\" + GameType + @"\adr_6.dds", @"img\" + GameType + @"\adr_8.dds" };
+            ADRImgS = Graphics_TSSET.ddsImgLoader(imgPaths, 46, 46, 9, 9, 32, 32).images;
+
+            imgPaths = new string[] { @"img\" + GameType + @"\adr_1_grey.dds", @"img\" + GameType + @"\adr_2_grey.dds", @"img\" + GameType + @"\adr_3_grey.dds", 
+                                      @"img\" + GameType + @"\adr_4_grey.dds", @"img\" + GameType + @"\adr_6_grey.dds", @"img\" + GameType + @"\adr_8_grey.dds" };
+            ADRImgSGrey = Graphics_TSSET.ddsImgLoader(imgPaths, 46, 46, 9, 9, 32, 32).images;
+
+            // skill level select
+            imgPaths = new string[] { @"img\UI\Profile\skill_bar_s.dds", @"img\UI\Profile\skill_bar_s2.dds", @"img\UI\Profile\skill_bar1.dds", @"img\UI\Profile\skill_bar2.dds", @"img\UI\Profile\skill_bar3.dds" };
+
             int y = 9;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < imgPaths.Count(); i++)
             {
-                if (i == 2)
-                    y = 8;
-                ms = new MemoryStream();
-                Bitmap temp = ImageFromDDS(imgpaths[i]);
-                temp.Clone(new Rectangle(9, y, 46, 46), temp.PixelFormat).Save(ms, ImageFormat.Png);
-                SkillImgSBG[i] = Image.FromStream(ms);
-                ms.Dispose();
+                if (i == 2) y = 8;
+
+                SkillImgSBG[i] = Graphics_TSSET.ddsImgLoader(new[] { imgPaths[i] }, 46, 46, 9, y).images[0];
             }
 
-            imgpaths = new string[] { @"img\skill_adr.dds", @"img\skill_distance.dds", @"img\skill_heavy.dds", @"img\skill_fragile.dds", @"img\skill_jit.dds", @"img\skill_mechanical.dds" };
-            SkillImgS = ExtImgLoader(imgpaths, 64, 64, 0, 0);
+            //=== Company
 
-            imgpaths = new string[] { @"img\profiles.dds", @"img\comp_man.dds", @"img\truck_service.dds", @"img\trailers.dds", @"img\company_job.dds", @"img\cargo_market.dds", @"img\maps.dds" };
-            TabpagesImages.Images.AddRange (ExtImgLoader(imgpaths, 64, 64, 64, 0));
-            //Garages
-            imgpaths = new string[] { @"img\garage_free_ico.dds", @"img\garage_free_ico.dds", @"img\garage_small_ico.dds", @"img\garage_large_ico.dds", @"img\garage_free_ico.dds", @"img\garage_free_ico.dds", @"img\garage_tiny_ico.dds" };
-            GaragesImg = ExtImgLoader(imgpaths, 32, 32, 0, 0);
-            //HQ garages
-            imgpaths = new string[] { @"img\garage_free_ico.dds", @"img\garage_free_ico.dds", @"img\hq_garage_ico_small_n.dds", @"img\hq_garage_ico_big_n.dds", @"img\garage_free_ico.dds", @"img\garage_free_ico.dds", @"img\hq_garage_ico_tiny_n.dds" };
-            GaragesHQImg = ExtImgLoader(imgpaths, 32, 32, 0, 0);
+            // garages
+            imgPaths = new string[] { @"img\UI\Company\Garages\garage_free_ico.dds", @"img\UI\Company\Garages\garage_free_ico.dds", @"img\UI\Company\Garages\garage_small_ico.dds", @"img\UI\Company\Garages\garage_large_ico.dds",
+                                      @"img\UI\Company\Garages\garage_free_ico.dds", @"img\UI\Company\Garages\garage_free_ico.dds", @"img\UI\Company\Garages\garage_tiny_ico.dds" };
+            GaragesImg = Graphics_TSSET.ddsImgLoader(imgPaths, 32, 32).images;
 
-            imgpaths = new string[] { @"img\city_pin_0.dds", @"img\city_pin_1.dds"};
-            CitiesImg = ExtImgLoader(imgpaths, 32, 32, 0, 0);
+            // hq
+            imgPaths = new string[] { @"img\UI\Company\Garages\garage_free_ico.dds", @"img\UI\Company\Garages\garage_free_ico.dds", @"img\UI\Company\Garages\hq_garage_ico_small_n.dds", @"img\UI\Company\Garages\hq_garage_ico_big_n.dds",
+                                      @"img\UI\Company\Garages\garage_free_ico.dds", @"img\UI\Company\Garages\garage_free_ico.dds", @"img\UI\Company\Garages\hq_garage_ico_tiny_n.dds" };
+            GaragesHQImg = Graphics_TSSET.ddsImgLoader(imgPaths, 32, 32).images;
 
-            imgpaths = new string[] { @"img\easy.dds", @"img\normal.dds", @"img\hard.dds" };
-            UrgencyImg = ExtImgLoader(imgpaths, 32, 32, 0, 0);
+            // visited cities
+            imgPaths = new string[] { @"img\UI\Company\VisitedCities\city_pin_0.dds", @"img\UI\Company\VisitedCities\city_pin_1.dds", @"img\UI\Company\VisitedCities\city_pin_2.dds", @"img\UI\notice_star.dds" };
+            CitiesImg = Graphics_TSSET.ddsImgLoader(imgPaths, 32, 32).images;
 
-            imgpaths = new string[] { @"img\none_32.dds", @"img\heavy.dds", @"img\articulated.dds" };
-            CargoTypeImg =  ExtImgLoader(imgpaths, 32, 32, 0, 0);
 
-            imgpaths = new string[] { @"img\fragile.dds", @"img\valuable.dds" };
-            CargoType2Img = ExtImgLoader(imgpaths, 32, 32, 0, 0);
+            //=== Truck & Trailer tab
 
-            imgpaths = new string[] { @"img\" + GameType + @"\engine.dds", @"img\" + GameType + @"\transmission.dds", @"img\" + GameType + @"\chassis.dds", @"img\" + GameType + @"\cabin.dds", @"img\" + GameType + @"\tyres.dds" };
-            TruckPartsImg = ExtImgLoader(imgpaths, 64, 64, 0, 0);
+            // truck parts
+            imgPaths = new string[] { @"img\" + GameType + @"\engine.dds", @"img\" + GameType + @"\transmission.dds", @"img\" + GameType + @"\chassis.dds", 
+                                      @"img\" + GameType + @"\cabin.dds", @"img\" + GameType + @"\tyres.dds" };
+            TruckPartsImg = Graphics_TSSET.ddsImgLoader(imgPaths, 64, 64).images;
 
-            imgpaths = new string[] { @"img\" + GameType + @"\cargo.dds", @"img\" + GameType + @"\trailer_body.dds", @"img\" + GameType + @"\trailer_chassis.dds", @"img\" + GameType + @"\tyres.dds" };
-            TrailerPartsImg = ExtImgLoader(imgpaths, 64, 64, 0, 0);
+            // trailer parts
+            imgPaths = new string[] { @"img\" + GameType + @"\cargo.dds", @"img\" + GameType + @"\trailer_body.dds", 
+                                      @"img\" + GameType + @"\trailer_chassis.dds", @"img\" + GameType + @"\tyres.dds" };
+            TrailerPartsImg = Graphics_TSSET.ddsImgLoader(imgPaths, 64, 64).images;
 
-            imgpaths = new string[] { @"img\ETS2\game_n.dds", @"img\ATS\game_n.dds" };
-            GameIconeImg = ExtImgLoader(imgpaths, 32, 32, 0, 0);
-        }
+            // integrity progress bar
 
-        public Image[] ExtImgLoader(string[] _filenamesarray)
-        {
-            Image[] tempImgarray = new Image[_filenamesarray.Length];
+            imgPaths = new string[] { @"img\UI\wrench-pattern.png", @"img\UI\swap-pattern.png", @"img\UI\skull-pattern.png" };
 
-            for (int i = 0; i < _filenamesarray.Length; i++)
-            {
-                try
-                {
-                    MemoryStream ms = new MemoryStream();
+            VehicleIntegrityPBImg = Graphics_TSSET.ImgFromFileLoader(imgPaths);
 
-                    if (File.Exists(_filenamesarray[i]))
-                    {
-                        Bitmap temp = ImageFromDDS(_filenamesarray[i]);
-                        temp.Save(ms, ImageFormat.Png);
-                        tempImgarray[i] = Image.FromStream(ms);
-                        ms.Dispose();
-                    }
-                    else
-                        tempImgarray[i] = null;
-                }
-                catch
-                {
-                    tempImgarray[i] = null;
-                }
-            }
+            // buttons
+            imgPaths = new string[] { @"img\UI\Trucks&Trailers\service_ico.dds", @"img\UI\Trucks&Trailers\gas_ico.dds", @"img\UI\customize_p.dds" };
 
-            return tempImgarray;
-        }
+            Image[] imgArray = Graphics_TSSET.ddsImgLoader(imgPaths).images;
 
-        public Image[] ExtImgLoader(string[] _filenamesarray, int _width, int _height, int _x, int _y )
-        {
-            Image[] tempImgarray = new Image[_filenamesarray.Length];
+            RepairImg = imgArray[0];
+            RefuelImg = imgArray[1];
+            CustomizeImg = imgArray[2];
 
-            for (int i = 0; i < _filenamesarray.Length; i++)
-            {
-                try
-                {
-                    MemoryStream ms = new MemoryStream();
-                    Bitmap temp = ImageFromDDS(_filenamesarray[i]);
-                    temp.Clone(new Rectangle(_x, _y, _width, _height), temp.PixelFormat).Save(ms, ImageFormat.Png);
-                    tempImgarray[i] = Image.FromStream(ms);
-                    ms.Dispose();
-                }
-                catch
-                {
-                    tempImgarray[i] = new Bitmap(_width, _height);
-                }
-            }
+            //=== Freight market
 
-            return tempImgarray;
-        }
+            // urgency
+            imgPaths = new string[] { @"img\UI\FreightMarket\JobUrgency\easy.dds", @"img\UI\FreightMarket\JobUrgency\normal.dds", @"img\UI\FreightMarket\JobUrgency\hard.dds" };
+            UrgencyImg = Graphics_TSSET.ddsImgLoader(imgPaths, 32, 32).images;
 
-        public Image[] ExtImgLoader(string[] _filenamesarray, int _width, int _height, int _x, int _y, int _newwidth, int _newheight)
-        {
-            MemoryStream ms;
-            Image[] tempImgarray = new Image[_filenamesarray.Length];
+            // trailer type
+            imgPaths = new string[] { @"img\UI\FreightMarket\CargoTypes\none_32.dds", @"img\UI\FreightMarket\CargoTypes\heavy.dds", @"img\UI\FreightMarket\CargoTypes\articulated.dds" };
+            CargoTypeImg = Graphics_TSSET.ddsImgLoader(imgPaths, 32, 32).images;
 
-            for (int i = 0; i < _filenamesarray.Length; i++)
-            {
-                try
-                {
-                    ms = new MemoryStream();
-                    Bitmap temp = ImageFromDDS(_filenamesarray[i]);
-                    temp.Clone(new Rectangle(_x, _y, _width, _height), temp.PixelFormat).Save(ms, ImageFormat.Png);
-                    tempImgarray[i] = new Bitmap(Image.FromStream(ms), new Size(_newwidth, _newheight));
-                    ms.Dispose();
-                }
-                catch
-                {
-                    tempImgarray[i] = new Bitmap(_width, _height);
-                }
-            }
+            // cargo type
+            imgPaths = new string[] { @"img\UI\FreightMarket\CargoTypes\fragile.dds", @"img\UI\FreightMarket\CargoTypes\valuable.dds" };
+            CargoType2Img = Graphics_TSSET.ddsImgLoader(imgPaths, 32, 32).images;
 
-            return tempImgarray;
-        }
+            // Accessories icons
+            List<Image> tmpIMGlist = new List<Image>();
 
-        private Bitmap ImageFromDDS(string _path)
-        {
-            Bitmap bitmap = null;
+            imgPaths = new string[] { @"img\UI\Trucks&Trailers\Accessories\truck_config.dds", @"img\UI\Trucks&Trailers\Accessories\upgrades.dds" };
+            tmpIMGlist.AddRange(Graphics_TSSET.ddsImgLoader(imgPaths, 40, 40, 0, 0, 32, 32).images);
 
-            if (File.Exists(_path))
-            {
-                S16.Drawing.DDSImage asd;
-                using (FileStream fsimage = new FileStream(_path, FileMode.Open))
-                    asd = new S16.Drawing.DDSImage(fsimage);
+            imgPaths = new string[] { @"img\" + GameType + @"\tyres.dds" };
+            tmpIMGlist.AddRange(Graphics_TSSET.ddsImgLoader(imgPaths, 42, 42, 5, 5, 32, 32).images);
 
-                bitmap = asd.BitmapImage;
+            imgPaths = new string[] { @"img\UI\Trucks&Trailers\Accessories\use_preset.dds" };
+            tmpIMGlist.AddRange(Graphics_TSSET.ddsImgLoader(imgPaths, 24, 24, 16, 16, 32, 32).images);
 
-                return bitmap;
-            }
-            else
-                return bitmap;
+            imgPaths = new string[] { @"img\UI\Trucks&Trailers\Accessories\mute_checkbox_2.dds" };
+            tmpIMGlist.AddRange(Graphics_TSSET.ddsImgLoader(imgPaths, 32, 32, 0, 0, 32, 32, 4).images);
+
+            imgPaths = new string[] { @"img\UI\Trucks&Trailers\Accessories\plate_number.dds" };
+            tmpIMGlist.AddRange(Graphics_TSSET.ddsImgLoader(imgPaths, 80, 54, 0, 0, 32, 32).images);
+
+            AccessoriesImg = tmpIMGlist.ToArray();
+
         }
 
         //Save new language strings
@@ -579,176 +589,159 @@ namespace TS_SE_Tool
             return _buffer;
         }
 
-        private void LoadSaveFile()
+        private void LoadSaveFile(object sender, DoWorkEventArgs e)
         {
-            SetDefaultValues(false);
-            ClearFormControls(true);
+            UpdateStatusBarMessage.MainForm = Application.OpenForms.OfType<FormMain>().Single();
 
-            ClearJobData();
-
+            // Status
             UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Info, "message_decoding_save_file");
+            IO_Utilities.LogWriter("Working on " + Globals.SelectedSavePath + " save file");
 
-            SavefilePath = Globals.SavesHex[comboBoxSaves.SelectedIndex];
-            Globals.SelectedSavePath = SavefilePath;
-            Globals.SelectedSave = Globals.SavesHex[comboBoxSaves.SelectedIndex].Split(new string[] { "\\" }, StringSplitOptions.None).Last();
+            // Variables
+            string SiiProfilePath = Globals.SelectedProfilePath + @"\profile.sii";
+            string SiiInfoPath = Globals.SelectedSavePath + @"\info.sii";
+            string SiiSavePath = Globals.SelectedSavePath + @"\game.sii";
 
-            IO_Utilities.LogWriter("Working on " + SavefilePath + " save file");
-
-            string SiiProfilePath = Globals.ProfilesHex[comboBoxProfiles.SelectedIndex] + @"\profile.sii";
-
-            Globals.SelectedProfilePath = Globals.ProfilesHex[comboBoxProfiles.SelectedIndex];
-            Globals.SelectedProfile = Globals.ProfilesHex[comboBoxProfiles.SelectedIndex].Split(new string[] { "\\" }, StringSplitOptions.None).Last();
-
-            string SiiInfoPath = SavefilePath + @"\info.sii";
-
-            string SiiSavePath = SavefilePath + @"\game.sii";
-
-            string dbPath = "dbs/" + GameType + "." + Path.GetFileName(Globals.ProfilesHex[comboBoxProfiles.SelectedIndex]) + ".sdf";
-            DBconnection = new SqlCeConnection("Data Source = " + dbPath);
+            (bool valid, string[] fileArray) resulCheck;
 
             if (File.Exists(SiiSavePath))
+            {
+                string dbPath = "dbs/" + GameType + "." + Path.GetFileName(Globals.SelectedProfilePath) + ".sdf";
+                DBconnection = new SqlCeConnection("Data Source = " + dbPath);
+
                 CreateDatabase(dbPath);
+            }                
             else
+            {
+                e.Cancel = true;
+
+                DialogResult DR = UpdateStatusBarMessage.ShowMessageBox(this, "Save file does not exist.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
                 return;
+            }
 
-            //Profile Info
-            if (!File.Exists(SiiProfilePath))
+            //=== Profile Info
+            resulCheck = preProcessFile(SiiProfilePath, "Profile file");
+
+            if (resulCheck.valid)
             {
-                IO_Utilities.LogWriter("File does not exist in " + SiiProfilePath);
-                UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_could_not_find_file");
+                tempProfileFileInMemory = resulCheck.fileArray;
+
+                MainSaveFileProfileData = new SaveFileProfileData();
+                MainSaveFileProfileData.ProcessData(tempProfileFileInMemory);
+
+                tempProfileFileInMemory = null;
             }
             else
             {
-                FileDecoded = false;
-                try
-                {
-                    int decodeAttempt = 0;
-                    while (decodeAttempt < 5)
-                    {
-                        tempProfileFileInMemory = NewDecodeFile(SiiProfilePath);
+                e.Cancel = true;
 
-                        if (FileDecoded)
-                        {
-                            break;
-                        }
+                DialogResult DR = UpdateStatusBarMessage.ShowMessageBox(this, "Error occured during preprocessing Profile file." + Environment.NewLine +
+                    "Probably New \\ Updated format.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
-                        decodeAttempt++;
-                    }
-
-                    if (decodeAttempt == 5)
-                    {
-                        UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_could_not_decode_file");
-                        IO_Utilities.LogWriter("Could not decrypt after 5 attempts");
-                    }
-                }
-                catch
-                {
-                    IO_Utilities.LogWriter("Could not read: " + SiiProfilePath);
-                }
-
-                if ((tempProfileFileInMemory == null) || (tempProfileFileInMemory[0] != "SiiNunit"))
-                {
-                    IO_Utilities.LogWriter("Wrongly decoded Profile file or wrong file format");
-                    UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_file_not_decoded");
-
-                    tempProfileFileInMemory = null;
-
-                    SetDefaultValues(false);
-                    ToggleMainControlsAccess(true);
-                    ToggleControlsAccess(false);
-                }
-                else if (tempProfileFileInMemory != null)
-                {
-                    MainSaveFileProfileData = new SaveFileProfileData();
-                    MainSaveFileProfileData.ProcessData(tempProfileFileInMemory);
-                }
+                return;
             }
+            //=== End Profile Info
 
-            tempProfileFileInMemory = null; //clearmemory
-            //End Profile Info
+            //=== Save info
+            resulCheck = preProcessFile(SiiInfoPath, "Info file");
 
-            //Save info
-            if (!File.Exists(SiiInfoPath))
+            if (resulCheck.valid)
             {
-                IO_Utilities.LogWriter("File does not exist in " + SiiInfoPath);
-                UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_could_not_find_file");
+                tempInfoFileInMemory = resulCheck.fileArray;
+
+                CheckSaveInfoData();
+                tempInfoFileInMemory = null;
             }
             else
             {
-                FileDecoded = false;
-                try
-                {
-                    int decodeAttempt = 0;
-                    while (decodeAttempt < 5)
-                    {
-                        tempInfoFileInMemory = NewDecodeFile(SiiInfoPath);
+                e.Cancel = true;
 
-                        if (FileDecoded)
-                        {
-                            break;
-                        }
-                        decodeAttempt++;
-                    }
+                DialogResult DR = UpdateStatusBarMessage.ShowMessageBox(this, "Error occured during preprocessing Info file." + Environment.NewLine +
+                    "Probably New \\ Updated format.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
-                    if (decodeAttempt == 5)
-                    {
-                        UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_could_not_decode_file");
-                        IO_Utilities.LogWriter("Could not decrypt after 5 attempts");
-                    }
-                }
-                catch
-                {
-                    IO_Utilities.LogWriter("Could not read: " + SiiInfoPath);
-                }
-
-                if ((tempInfoFileInMemory == null) || (tempInfoFileInMemory[0] != "SiiNunit"))
-                {
-                    IO_Utilities.LogWriter("Wrongly decoded Info file or wrong file format");
-                    UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_file_not_decoded");
-
-                    tempInfoFileInMemory = null;
-
-                    SetDefaultValues(false);
-                    ToggleMainControlsAccess(true);
-                    ToggleControlsAccess(false);
-                }
-                else if (tempInfoFileInMemory != null)
-                {   
-                    CheckSaveInfoData();
-                }
+                return;
             }
 
-            tempInfoFileInMemory = null; //clearmemory
-            //endinfo
+            //=== End Save Info
 
+            //=== Check for Dependencies conflict
             if (!InfoDepContinue)
             {
-                ToggleMainControlsAccess(true);
+                e.Cancel = true;
                 return;
             }
+            //=== End
 
-            //End Save Info
+            //=== Save file
+            resulCheck = preProcessFile(SiiSavePath, "Save file");
 
-            //Save file
-            if (!File.Exists(SiiSavePath))
+            if (resulCheck.valid)
             {
-                IO_Utilities.LogWriter("File does not exist in " + SavefilePath);
-                UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_could_not_find_file");
+                tempSavefileInMemory = resulCheck.fileArray;
+
+                LastModifiedTimestamp = File.GetLastWriteTime(SiiSavePath);
+
+                if (!NewPrepareData())
+                {
+                    e.Cancel = true;
+
+                    DialogResult DR = UpdateStatusBarMessage.ShowMessageBox(this, "Error occured during preparing Save file." + Environment.NewLine +
+                        "Probably New \\ Updated Save format.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+                    return;
+                }
             }
             else
             {
-                FileDecoded = false;
+                e.Cancel = true;
+
+                DialogResult DR = UpdateStatusBarMessage.ShowMessageBox(this, "Error occured during preprocessing Save file." + Environment.NewLine +
+                    "Probably New \\ Updated Save format.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+                return;
+            }
+            // End Save file
+
+            //===
+            (bool valid, string[] fileArray) preProcessFile(string _filePath, string _type)
+            {
+                string[] _inputArray;
+
+                if (!File.Exists(_filePath))
+                {
+                    IO_Utilities.LogWriter("File does not exist in " + _filePath);
+                    UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_could_not_find_file");
+
+                    return (false, null);
+                }
+                else
+                {
+                    FileDecoded = false;
+                    _inputArray = decodeFile(_filePath);
+                    bool checkResult = checkDecodedFile(_inputArray, _type);
+
+                    return (checkResult, _inputArray);
+                }
+            }
+            //===
+            string[] decodeFile(string _filePath)
+            {
+                string[] fileArray = null;
+
                 try
                 {
                     int decodeAttempt = 0;
+
                     while (decodeAttempt < 5)
                     {
-                        tempSavefileInMemory = NewDecodeFile(SiiSavePath);
+                        fileArray = NewDecodeFile(_filePath);
 
                         if (FileDecoded)
                         {
                             break;
                         }
+
                         decodeAttempt++;
                     }
 
@@ -760,40 +753,31 @@ namespace TS_SE_Tool
                 }
                 catch
                 {
-                    IO_Utilities.LogWriter("Could not read: " + SiiSavePath);
+                    IO_Utilities.LogWriter("Could not read: " + _filePath);
                 }
 
-                if ((tempSavefileInMemory == null) || (tempSavefileInMemory[0] != "SiiNunit"))
+                return fileArray;
+            }
+            //===
+            bool checkDecodedFile(string[] _input, string _type)
+            {
+                if (_input == null || _input[0] != "SiiNunit")
                 {
-                    IO_Utilities.LogWriter("Wrongly decoded Save file or wrong file format");
+                    IO_Utilities.LogWriter("Wrongly decoded " + _type + " or wrong file format");
                     UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_file_not_decoded");
 
-                    tempSavefileInMemory = null;
+                    _input = null;
 
-                    SetDefaultValues(false);
-                    ToggleMainControlsAccess(true);
-                    ToggleControlsAccess(false);
+                    return false;
                 }
-                else if (tempSavefileInMemory != null)
-                {
-                    LastModifiedTimestamp = File.GetLastWriteTime(SiiSavePath);
-
-                    worker = new BackgroundWorker();
-                    worker.WorkerReportsProgress = true;
-
-                    worker.DoWork += NewPrepareData;//Start;
-                    worker.ProgressChanged += worker_ProgressChanged;
-                    worker.RunWorkerCompleted += worker_RunWorkerCompleted;
-
-                    worker.RunWorkerAsync();
-                }
+                else
+                    return true;
             }
+            //===
         }
 
-        private void LoadProfileDataFile()
+        private void LoadProfileDataFile(string SiiProfilePath)
         {
-            string SiiProfilePath = Globals.ProfilesHex[comboBoxProfiles.SelectedIndex] + @"\profile.sii";
-
             //Profile Info
             if (!File.Exists(SiiProfilePath))
             {
@@ -858,6 +842,17 @@ namespace TS_SE_Tool
 
         void worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
+            if (e.Cancelled == true)
+            {
+                SetDefaultValues(false);
+                ToggleMainControlsAccess(true);
+                ToggleControlsAccess(false);
+
+                //UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Clear);
+
+                return;
+            }
+
             if (SiiNunitData.UnidentifiedBlocks.Count > 0)
             {
                 MessageBox.Show("Some of the blocks in save file was not recognized and it may affect Program behavior." + Environment.NewLine + Environment.NewLine +
@@ -866,17 +861,82 @@ namespace TS_SE_Tool
                     "Unidentified blocks in save file", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
 
+            SiiNunitData.NamelessControlList.Sort();
+            SiiNunitData.NamelessIgnoreList.Sort();
+            SiiNunitData.UnidentifiedBlocks.Sort();
+
             toolStripProgressBarMain.Value = 0;
             //ClearFormControls(false);
 
             ToggleMainControlsAccess(true);
-            buttonMainDecryptSave.Enabled = false;
             ToggleControlsAccess(true);
 
-            PopulateFormControlsk();
+            PopulateFormControls();
 
-            IO_Utilities.LogWriter("Successfully completed work with " + SavefilePath + " save file");
+            IO_Utilities.LogWriter("Successfully completed work with " + Globals.SelectedSavePath + " save file");
+
+            //GC
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
+
+        void workerWrite_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            if (e.Error != null)
+            {
+                ToggleMainControlsAccess(true);
+                ToggleControlsAccess(true);
+
+                string details = DescribeException(e.Error);
+
+                IO_Utilities.ErrorLogWriter("Error during Writing save file" + Environment.NewLine + details);
+
+                string[] failedDialog = HelpTranslateDialogOrDefault("SaveWriteFailed",
+                    "Error during Writing save file",
+                    "Something went wrong during Writing Save file." + Environment.NewLine +
+                    "The save file itself was NOT modified." + Environment.NewLine + Environment.NewLine +
+                    "{0}" + Environment.NewLine +
+                    "Full details were appended to errorlog.log");
+
+                MessageBox.Show(string.Format(failedDialog[1], details), failedDialog[0],
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+                return;
+            }
+
+            if (SaveWriteSkipped)
+            {
+                ToggleMainControlsAccess(true);
+                ToggleControlsAccess(true);
+
+                toolStripProgressBarMain.Value = 0;
+
+                string[] skippedDialog = HelpTranslateDialogOrDefault("SaveNotWritten",
+                    "Save file NOT written",
+                    "The save file on disk changed after it was loaded, so nothing was written." + Environment.NewLine +
+                    "Reload the save and redo your changes.");
+
+                MessageBox.Show(skippedDialog[1], skippedDialog[0],
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+                return;
+            }
+
+            toolStripProgressBarMain.Value = 0;
+
+            ClearFormControls(false);
+
+            ToggleMainControlsAccess(true);
+            ToggleControlsAccess(false);
+
+            //GC
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+
+            IO_Utilities.LogWriter("Save game successfully writen in " + Globals.SelectedSavePath);
+            MessageBox.Show("File saved", "Saving", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
 
         private void PrintAddedJobs()
         {
@@ -933,10 +993,71 @@ namespace TS_SE_Tool
             }
         }
 
-        //button_save_file
-        private void NewWrireSaveFile()
+        //Set by NewWrireSaveFile when it deliberately writes nothing.
+        private bool SaveWriteSkipped = false;
+
+        /// <summary>
+        /// Caption and text for a dialog, falling back to the supplied English strings
+        /// when the active language pack does not carry the keys yet.
+        /// </summary>
+        private string[] HelpTranslateDialogOrDefault(string _dialogName, string _defaultCaption, string _defaultText)
         {
-            string SiiSavePath = SavefilePath + @"\game.sii";
+            string[] translated = HelpTranslateDialog(_dialogName);
+
+            return new string[]
+            {
+                string.IsNullOrEmpty(translated[0]) ? _defaultCaption : translated[0],
+                string.IsNullOrEmpty(translated[1]) ? _defaultText : Regex.Unescape(translated[1])
+            };
+        }
+
+        /// <summary>
+        /// Full exception detail - type, message, offending method and stack - for every
+        /// level of the InnerException chain.
+        /// </summary>
+        internal static string DescribeException(Exception _ex)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            for (Exception ex = _ex; ex != null; ex = ex.InnerException)
+            {
+                sb.AppendLine(ex.GetType().FullName + ": " + ex.Message);
+
+                if (ex.TargetSite != null)
+                    sb.AppendLine("  at " + ex.TargetSite.DeclaringType + "." + ex.TargetSite.Name);
+
+                if (!string.IsNullOrEmpty(ex.StackTrace))
+                    sb.AppendLine(ex.StackTrace);
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Writes to a sibling temporary file first and only then swaps it in, so an
+        /// interrupted or failing write can never leave a truncated save behind.
+        /// </summary>
+        private static void WriteTextFileAtomic(string _path, string _content)
+        {
+            string tempPath = _path + ".tsset_tmp";
+
+            using (StreamWriter writer = new StreamWriter(tempPath, false))
+            {
+                writer.Write(_content);
+            }
+
+            if (File.Exists(_path))
+                File.Delete(_path);
+
+            File.Move(tempPath, _path);
+        }
+
+        //button_save_file
+        private void NewWrireSaveFile(object sender, DoWorkEventArgs e)
+        {
+            string ProfileFolderPath = Globals.SelectedProfilePath + "\\profile.sii";
+            string SiiInfoPath = Globals.SelectedSavePath + "\\info.sii";
+            string SiiSavePath = Globals.SelectedSavePath + "\\game.sii";
 
             UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Info, "message_saving_file");
 
@@ -944,9 +1065,14 @@ namespace TS_SE_Tool
             {
                 UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_file_was_modified");
                 IO_Utilities.LogWriter("Save game was modified - reload file to prevent progress loss");
+
+                //Nothing was written - do not let RunWorkerCompleted report success.
+                SaveWriteSkipped = true;
             }
             else
             {
+                SaveWriteSkipped = false;
+
                 //Prepare
                 PrepareEvents();
 
@@ -961,22 +1087,40 @@ namespace TS_SE_Tool
 
                 PrintAddedJobs();
 
-                //Write
-                using (StreamWriter writer = new StreamWriter(SiiSavePath, false))
-                {
-                    writer.Write(SiiNunitData.PrintOut(0));
-                }
+                //Serialise EVERYTHING first.
+                //Opening a StreamWriter truncates the target immediately, so building the
+                //text inside the using() meant that any serialiser exception left game.sii
+                //on disk as a 0 byte file. Never touch a file before its replacement
+                //content exists.
+                string profileText = MainSaveFileProfileData.isEdited ? MainSaveFileProfileData.PrintOut() : null;
+                string infoText = MainSaveFileInfoData.isEdited ? MainSaveFileInfoData.PrintOut() : null;
+                string saveText = SiiNunitData.PrintOut(MainSaveFileInfoData.Version);
 
-                UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Info, "message_file_saved");
-                
+                if (string.IsNullOrEmpty(saveText))
+                    throw new InvalidOperationException("Serialised game.sii is empty - refusing to overwrite the save file.");
+
+                //Backup
+                string ProfileFolderPathBackup = Globals.SelectedProfilePath + "\\profile_backup.sii";
+                string SiiInfoPathBackup = Globals.SelectedSavePath + "\\info_backup.sii";
+                string SiiSavePathBackup = Globals.SelectedSavePath + "\\game_backup.sii";
+
+                File.Copy(ProfileFolderPath, ProfileFolderPathBackup, true);
+                File.Copy(SiiInfoPath, SiiInfoPathBackup, true);
+                File.Copy(SiiSavePath, SiiSavePathBackup, true);
+
+                //Write Profile data
+                if (profileText != null)
+                    WriteTextFileAtomic(ProfileFolderPath, profileText);
+
+                //Write Info data
+                if (infoText != null)
+                    WriteTextFileAtomic(SiiInfoPath, infoText);
+
+                //Write Save data
+                WriteTextFileAtomic(SiiSavePath, saveText);
+
+                UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Info, "message_file_saved");                
             }
-
-            //dispose attempt
-            SetDefaultValues(false);
-            ClearFormControls(true);
-
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
         }
 
         private void GetTranslationFiles()
@@ -1070,10 +1214,10 @@ namespace TS_SE_Tool
         //Caching
         private void CacheGameData()
         {
-            worker = new BackgroundWorker();
-            worker.WorkerReportsProgress = false;
-            worker.DoWork += CacheExternalGameData;
-            worker.RunWorkerAsync();
+            generalWorker = new BackgroundWorker();
+            generalWorker.WorkerReportsProgress = false;
+            generalWorker.DoWork += CacheExternalGameData;
+            generalWorker.RunWorkerAsync();
         }
 
         private void CacheExternalGameData(object sender, DoWorkEventArgs e)

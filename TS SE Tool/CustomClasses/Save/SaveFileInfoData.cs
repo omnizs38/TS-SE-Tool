@@ -23,17 +23,18 @@ using System.IO;
 
 using TS_SE_Tool.Utilities;
 using TS_SE_Tool.Save.DataFormat;
+using TS_SE_Tool.Save.Items;
 
 namespace TS_SE_Tool
 {
-    public class SaveFileInfoData
+    class SaveFileInfoData : SiiNBlockCore
     {
         private string SaveContainerNameless { get; set; } = "";
 
         //Data
-        internal SCS_String Name { get; set; } = "";     //Save name
+        internal SCS_String Name { get; set; } = "";
 
-        public uint Time { get; set; } = 0;      //IngameTime
+        public uint Time { get; set; } = 0;
         public uint FileTime { get; set; } = 0;
         public ushort Version { get; set; } = 0;
 
@@ -49,17 +50,18 @@ namespace TS_SE_Tool
         //
         internal List<Dependency> Dependencies { get; set; } = new List<Dependency>();
 
-        //====
-        Dictionary<string, string> unsortedDataDictionary = new Dictionary<string, string>();
+        //
+        internal bool isEdited { get; set; } = false;
+
+        int unsortedOrder = 0;
+
+        Dictionary<int, List<string>> unsortedDataDict = new Dictionary<int, List<string>>();
 
         //Methods
-
         public void ProcessData(string[] _fileLines)
         {
             string currentLine = "";
             string tagLine = "", dataLine = "";
-
-            byte exitLoopMarker = 2;
 
             for (int lineNumber = 0; lineNumber < _fileLines.Length; lineNumber++)
             {
@@ -77,129 +79,136 @@ namespace TS_SE_Tool
                     tagLine = currentLine.Trim();
                     dataLine = "";
                 }
-
-                switch (tagLine)
+                try
                 {
-                    case "SiiNunit":
+                    switch (tagLine)
+                    {
+                        case "SiiNunit":
+                            {
+                                unsortedDataDict.Add(unsortedOrder, new List<string>());
+                                break;
+                            }
+                        case "":
+                        case "{":
+                            {
+                                break;
+                            }
+                        case "}":
+                            {
+                                unsortedOrder++;
+                                unsortedDataDict.Add(unsortedOrder, new List<string>());
+                                break;
+                            }
 
-                    case "":
-                        {
-                            break;
-                        }
+                        case "save_container":
+                            {
+                                unsortedOrder++;
+                                unsortedDataDict.Add(unsortedOrder, new List<string>());
 
-                    case "{":
-                        {
-                            break;
-                        }
+                                SaveContainerNameless = dataLine.Split(new char[] { '{' })[0].Trim();
+                                break;
+                            }
 
-                    case "}":
-                        {
-                            --exitLoopMarker;
+                        case "name":
+                            {
+                                Name = dataLine;
+                                break;
+                            }
 
-                            if (exitLoopMarker <= 0)
-                                goto endOfProcessData;
+                        case "time":
+                            {
+                                Time = uint.Parse(dataLine);
+                                break;
+                            }
 
-                            break;
-                        }
+                        case "file_time":
+                            {
+                                FileTime = uint.Parse(dataLine);
+                                break;
+                            }
 
-                    case "save_container":
-                        {
-                            SaveContainerNameless = dataLine.Split(new char[] { '{' })[0].Trim();
-                            break;
-                        }
+                        case "version":
+                            {
+                                Version = ushort.Parse(dataLine);
+                                break;
+                            }
 
-                    case "name":
-                        {
-                            Name = dataLine;
-                            break;
-                        }
+                        case "dependencies":
+                            {
+                                Dependencies.Capacity = int.Parse(dataLine);
+                                break;
+                            }
 
-                    case "time":
-                        {
-                            Time = uint.Parse(dataLine);
-                            break;
-                        }
+                        case var s when s.StartsWith("dependencies["):
+                            {
+                                Dependencies.Add(new Dependency(dataLine));
+                                break;
+                            }
 
-                    case "file_time":
-                        {
-                            FileTime = uint.Parse(dataLine);
-                            break;
-                        }
+                        case "info_version":
+                            {
+                                InfoVersion = byte.Parse(dataLine);
+                                break;
+                            }
 
-                    case "version":
-                        {
-                            Version = ushort.Parse(dataLine);
-                            break;
-                        }
+                        case "info_players_experience":
+                            {
+                                InfoPlayersExperience = uint.Parse(dataLine);
+                                break;
+                            }
 
-                    case "dependencies":
-                        {
-                            Dependencies.Capacity = int.Parse(dataLine);
-                            break;
-                        }
+                        case "info_unlocked_recruitments":
+                            {
+                                InfoUnlockedRecruitments = ushort.Parse(dataLine);
+                                break;
+                            }
 
-                    case var s when s.StartsWith("dependencies["):
-                        {
-                            Dependencies.Add(new Dependency(dataLine));
-                            break;
-                        }
+                        case "info_unlocked_dealers":
+                            {
+                                InfoUnlockedDealers = ushort.Parse(dataLine);
+                                break;
+                            }
 
-                    case "info_version":
-                        {
-                            InfoVersion = byte.Parse(dataLine);
-                            break;
-                        }
+                        case "info_visited_cities":
+                            {
+                                InfoVisitedCities = ushort.Parse(dataLine);
+                                break;
+                            }
 
-                    case "info_players_experience":
-                        {
-                            InfoPlayersExperience = uint.Parse(dataLine);
-                            break;
-                        }
+                        case "info_money_account":
+                            {
+                                InfoMoneyAccount = long.Parse(dataLine);
+                                break;
+                            }
 
-                    case "info_unlocked_recruitments":
-                        {
-                            InfoUnlockedRecruitments = ushort.Parse(dataLine);
-                            break;
-                        }
+                        case "info_explored_ratio":
+                            {
+                                InfoExploredRatio = NumericUtilities.HexFloatToSingleFloat(dataLine);
+                                break;
+                            }
 
-                    case "info_unlocked_dealers":
-                        {
-                            InfoUnlockedDealers = ushort.Parse(dataLine);
-                            break;
-                        }
+                        default:
+                            {
+                                unsortedDataDict[unsortedOrder].Add(currentLine);
 
-                    case "info_visited_cities":
-                        {
-                            InfoVisitedCities = ushort.Parse(dataLine);
-                            break;
-                        }
-
-                    case "info_money_account":
-                        {
-                            InfoMoneyAccount = long.Parse(dataLine);
-                            break;
-                        }
-
-                    case "info_explored_ratio":
-                        {
-                            InfoExploredRatio = NumericUtilities.HexFloatToSingleFloat(dataLine);
-                            break;
-                        }
-
-                    default:
-                        {
-                            unsortedDataDictionary.Add(tagLine, dataLine);
-                            break;
-                        }
+                                IO_Utilities.ErrorLogWriter(WriteErrorMsg(tagLine, dataLine));
+                                break;
+                            }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    IO_Utilities.ErrorLogWriter(WriteErrorMsg(ex.Message, tagLine, dataLine));
+                    continue;
                 }
 
             }
-
-            endOfProcessData:;
         }
 
-        public string GetDataText()
+        public string PrintOut()
         {
+            int unsortedOrder = 0;
+
             bool InfoExist55 = false;
             if (Version >= 55 && this.InfoVersion > 0)
                 InfoExist55 = true;
@@ -208,6 +217,8 @@ namespace TS_SE_Tool
 
             sbResult.AppendLine("SiiNunit");
             sbResult.AppendLine("{");
+
+            writeUnsortedLines();
 
             sbResult.AppendLine("save_container : " + SaveContainerNameless + " {");
             sbResult.AppendLine(" name: " + Name);
@@ -232,26 +243,33 @@ namespace TS_SE_Tool
                 sbResult.AppendLine(" info_explored_ratio: " + InfoExploredRatio.ToString());
             }
 
-            //Add lines with unsorted data
-            if (unsortedDataDictionary.Count > 0)
-            {
-                foreach (KeyValuePair<string, string> record in unsortedDataDictionary)
-                {
-                    sbResult.AppendLine(" " + record.Key + ": " + record.Value);
-                }
-            }
-            //===
+            writeUnsortedLines();
 
             sbResult.AppendLine("}");
+
+            writeUnsortedLines();
+
             sbResult.AppendLine();
             sbResult.Append("}");
 
             return sbResult.ToString();
+
+            //=== Help methods
+
+            void writeUnsortedLines()
+            {
+                if (unsortedDataDict[unsortedOrder].Count > 0)
+                {
+                    foreach (string line in unsortedDataDict[unsortedOrder])
+                        sbResult.AppendLine(line);
+                }
+                unsortedOrder++;
+            }
         }
 
         public void WriteToStream(StreamWriter _streamWriter)
         {
-            _streamWriter.Write(GetDataText());
+            _streamWriter.Write(PrintOut());
         }
 
     }

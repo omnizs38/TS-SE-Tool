@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TS_SE_Tool.Utilities;
 
 namespace TS_SE_Tool.Save.Items
 {
@@ -14,8 +15,21 @@ namespace TS_SE_Tool.Save.Items
 
         internal int param { get; set; } = 0;
 
+        //Since savefile v97 this is an unsigned 32 bit value whose top bit is used as a
+        //flag (e.g. 2147483648). int.Parse overflowed on it. The raw text is kept so the
+        //value round-trips untouched, while param stays usable for the tool's own logic.
+        internal string paramRaw { get; set; } = "0";
+
         internal Economy_event()
         { }
+
+        internal Economy_event(uint _time, string _unit_link, int _param)
+        {
+            time = _time;
+            unit_link = _unit_link;
+            param = _param;
+            paramRaw = _param.ToString();
+        }
 
         internal Economy_event(string[] _input)
         {
@@ -35,11 +49,14 @@ namespace TS_SE_Tool.Save.Items
                     tagLine = currentLine.Trim();
                     dataLine = "";
                 }
+
                 try
                 {
                     switch (tagLine)
                     {
                         case "":
+                        case "economy_event":
+                        case "}":
                             {
                                 break;
                             }
@@ -58,15 +75,29 @@ namespace TS_SE_Tool.Save.Items
 
                         case "param":
                             {
-                                param = int.Parse(dataLine);
+                                paramRaw = dataLine;
+
+                                if (!int.TryParse(dataLine, out int parsedParam))
+                                    parsedParam = uint.TryParse(dataLine, out uint unsignedParam)
+                                                    ? unchecked((int)unsignedParam)
+                                                    : 0;
+
+                                param = parsedParam;
+                                break;
+                            }
+
+                        default:
+                            {
+                                UnidentifiedLines.Add(currentLine);
+                                IO_Utilities.ErrorLogWriter(WriteErrorMsg(tagLine, dataLine));
                                 break;
                             }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Utilities.IO_Utilities.ErrorLogWriter(ex.Message + Environment.NewLine + this.GetType().Name.ToLower() + " | " + tagLine + " = " + dataLine);
-                    break;
+                    IO_Utilities.ErrorLogWriter(WriteErrorMsg(ex.Message, tagLine, dataLine));
+                    continue;
                 }
             }
         }
@@ -83,7 +114,9 @@ namespace TS_SE_Tool.Save.Items
 
             returnSB.AppendLine(" unit_link: " + unit_link);
 
-            returnSB.AppendLine(" param: " + param.ToString());
+            returnSB.AppendLine(" param: " + paramRaw);
+
+            returnSB.Append(WriteUnidentifiedLines());
 
             returnSB.AppendLine("}");
 

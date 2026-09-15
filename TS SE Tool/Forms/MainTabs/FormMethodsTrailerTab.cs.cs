@@ -24,6 +24,9 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 
 using TS_SE_Tool.Global;
+using TS_SE_Tool.Utilities;
+using System.Threading;
+using TS_SE_Tool.Save;
 
 namespace TS_SE_Tool
 {
@@ -59,7 +62,7 @@ namespace TS_SE_Tool
             buttonInfo.FlatStyle = FlatStyle.Flat;
             buttonInfo.Size = new Size(CustomizeImg.Width, CustomizeImg.Height);
             buttonInfo.Name = "buttonTrailerInfo";
-            buttonInfo.BackgroundImage = ConvertBitmapToGrayscale(CustomizeImg);
+            buttonInfo.BackgroundImage = Graphics_TSSET.ConvertBitmapToGrayscale(CustomizeImg);
             buttonInfo.BackgroundImageLayout = ImageLayout.Zoom;
             buttonInfo.Text = "";
             buttonInfo.FlatAppearance.BorderSize = 0;
@@ -157,7 +160,9 @@ namespace TS_SE_Tool
 
                 tbllPanel.Controls.Add(button, 2, 1);
             }
+
             //License plate
+            //label
             Label labelPlate = new Label();
             labelPlate.Name = "labelUserTrailerLicensePlate";
             labelPlate.Text = "License plate";
@@ -165,6 +170,9 @@ namespace TS_SE_Tool
             labelPlate.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
             labelPlate.TextAlign = ContentAlignment.MiddleCenter;
 
+            tableLayoutPanelTrailerLP.Controls.Add(labelPlate, 0, 0);
+
+            //text
             Label lcPlate = new Label();
             lcPlate.Name = "labelLicensePlateTrailer";
             lcPlate.Text = "A 000 AA";
@@ -172,22 +180,55 @@ namespace TS_SE_Tool
             lcPlate.Dock = DockStyle.Fill;
             lcPlate.TextAlign = ContentAlignment.MiddleLeft;
 
-            tableLayoutPanelTrailerLP.Controls.Add(labelPlate, 0, 0);
             tableLayoutPanelTrailerLP.Controls.Add(lcPlate, 1, 0);
 
-            //
+            //button Edit
+            Button buttonLPEdit = new Button();
+            buttonLPEdit.Size = new Size(CustomizeImg.Width, CustomizeImg.Height);
+            buttonLPEdit.Name = "buttonTrailerLicensePlateEdit";
+            buttonLPEdit.BackgroundImage = CustomizeImg;
+            buttonLPEdit.BackgroundImageLayout = ImageLayout.Zoom;
+            buttonLPEdit.Text = "";
+            buttonLPEdit.Margin = new Padding(3, 0, 3, 0);
+            buttonLPEdit.Enabled = true;
+            buttonLPEdit.Dock = DockStyle.Fill;
+            buttonLPEdit.Click += new EventHandler(buttonTrailerLicensePlateEdit_Click);
+
+            tableLayoutPanelTrailerLP.Controls.Add(buttonLPEdit, 2, 0);
+
+            //image
             Panel LPpanel = new Panel();
             LPpanel.Dock = DockStyle.Fill;
             LPpanel.Margin = new Padding(0);
             LPpanel.Name = "TrailerLicensePlateIMG";
             LPpanel.BackgroundImageLayout = ImageLayout.Center;
+            LPpanel.BorderStyle = BorderStyle.None;
 
-            tableLayoutPanelTrailerLP.Controls.Add(LPpanel, 2, 0);
+            tableLayoutPanelTrailerLP.Controls.Add(LPpanel, 3, 0);
+        }
+        
+        public void buttonTrailerLicensePlateEdit_Click(object sender, EventArgs e)
+        {
+            UserTrailerDictionary.TryGetValue(comboBoxUserTrailerCompanyTrailers.SelectedValue.ToString(), out UserCompanyTrailerData SelectedUserCompanyTrailer);
+            string LicensePlateText = SelectedUserCompanyTrailer.TrailerMainData.license_plate.Value;
+
+            FormLicensePlateEdit frm = new FormLicensePlateEdit(LicensePlateText);
+            frm.StartPosition = FormStartPosition.CenterParent;
+
+            if (frm.ShowDialog() == DialogResult.OK)
+            {
+                //Find label control
+                Label lpText = groupBoxUserTrailerTrailerDetails.Controls.Find("labelLicensePlateTrailer", true).FirstOrDefault() as Label;
+
+                SelectedUserCompanyTrailer.TrailerMainData.license_plate = new Save.DataFormat.SCS_String(frm.licenseplatetext);
+
+                UpdateTrailerPanelLicensePlate();
+            }
         }
 
         private void FillUserCompanyTrailerList()
         {
-            if (UserTrailerDictionary == null)
+            if (UserTrailerDictionary is null)
                 return;
 
             DataTable combDT = new DataTable();
@@ -206,11 +247,26 @@ namespace TS_SE_Tool
             dc = new DataColumn("DriverName", typeof(string));
             combDT.Columns.Add(dc);
 
+            dc = new DataColumn("TrailerState", typeof(string));
+            combDT.Columns.Add(dc);
+
+            CultureInfo ci = Thread.CurrentThread.CurrentUICulture;
+
+            string stringQT = ResourceManagerMain.GetPlainString("QuickJobTruckShort", ci),
+                   stringUT = ResourceManagerMain.GetPlainString("UsersTruckShort", ci),
+                   stringIU = ResourceManagerMain.GetPlainString("InUse", ci),
+                   stringIM = ResourceManagerMain.GetPlainString("ItemMissing", ci),
+                   stringBT = ResourceManagerMain.GetPlainString("BodyType", ci),
+                   stringAC = ResourceManagerMain.GetPlainString("AxlesCount", ci),
+                   stringCT = ResourceManagerMain.GetPlainString("ChainType", ci);
+
             DataColumn dcDisplay = new DataColumn("DisplayMember");
             dcDisplay.Expression = string.Format(
-                "IIF(UserTrailerNameless <> 'null', '[' + {0} +'] ' + IIF(GarageName <> '', {1} +' || ','') + {2} + " +
-                "IIF(DriverName <> 'null', ' || In use - ' + {3},''), '-- NONE --')",
-                "TrailerType", "GarageName", "TrailerName", "DriverName");
+                "IIF(UserTrailerNameless <> 'null', " +
+                "'[' + IIF(TrailerState <> '3', IIF(TrailerType = '0', '" + stringQT + "' ,'" + stringUT + "') ,'S') +'] ' + " +
+                "IIF(GarageName <> '', {1} +' || ','') + " +
+                "{2} + IIF(DriverName <> 'null', ' || " + stringIU + " - ' + {3},''), '" + stringIM + "')",
+                "TrailerType", "GarageName", "TrailerName", "DriverName", "TrailerState");
             combDT.Columns.Add(dcDisplay);
             //
 
@@ -219,44 +275,48 @@ namespace TS_SE_Tool
 
             foreach (KeyValuePair<string, UserCompanyTrailerData> UserTrailer in UserTrailerDictionary)
             {
-                if (UserTrailer.Value == null)
+                if (String.IsNullOrEmpty(UserTrailer.Key))
+                    continue;
+
+                if (UserTrailer.Value is null)
+                    continue;
+
+                if (UserTrailer.Value.TrailerMainData == null)
                     continue;
 
                 if (UserTrailer.Value.Main)
                 {
-                    string trailerNameless = "", 
-                           tmpTrailerType = "", tmpTrailerName = "", tmpGarageName = "", tmpDriverName = "";
-
-                    //link
-                    trailerNameless = UserTrailer.Key;
+                    string trailerNameless = UserTrailer.Key; //link
+                    string tmpTrailerName = "", tmpGarageName = "", tmpDriverName = "";
+                    byte tmpTrailerType = 0, tmpTruckState = 1;                    
 
                     //Quick job or Bought
                     if (UserTrailer.Value.Users)
                     {
-                        tmpTrailerType = "U";
+                        tmpTrailerType = 1;
 
-                        //Garage
-                        tmpGarageName = GaragesList.Find(x => x.Trailers.Contains(trailerNameless)).GarageNameTranslated;
-                    }
-                    else
-                    {
-                        tmpTrailerType = "Q";
+                        tmpTruckState = 2;
 
-                        //
-                        tmpGarageName = "---";
+                        Garages tmpGrg = GaragesList.Find(x => x.Trailers.Contains(trailerNameless));
+
+                        if (tmpGrg is null)
+                            continue;
+
+                        tmpGarageName = tmpGrg.GarageNameTranslated;
                     }
 
                     //Trailer type
-                    string trailerdef = UserTrailer.Value.TrailerMainData.trailer_definition;
+                    Save.Items.Trailer tmpTrailerData = UserTrailer.Value.TrailerMainData;
+
+                    string trailerdef = tmpTrailerData.trailer_definition;
 
                     if (UserTrailerDefDictionary.Count > 0)
                     {
                         if (UserTrailerDefDictionary.ContainsKey(trailerdef))
                         {
-                            string[] trailerDefPropertys = { "body_type", "axles", "chain_type" };
-                            string[] trailerDefExtra = { "{0}", "{0} axles", "{0}" };
+                            string[] trailerDefExtra = { stringBT, stringAC, stringCT };
                             string trailername = "";
-                            int iCounter = 0;
+                            int lCounter = 0;
 
                             Save.Items.Trailer_Def CurTrailerDef = UserTrailerDefDictionary[trailerdef];
 
@@ -266,14 +326,15 @@ namespace TS_SE_Tool
 
                             void addToString(string _input)
                             {
-                                if (_input != "")
+                                if (!string.IsNullOrEmpty(_input))
                                 {
-                                    if (trailername != "")
+                                    if (!string.IsNullOrEmpty(trailername))
                                         trailername += " | ";
-                                    trailername += String.Format(trailerDefExtra[iCounter], CultureInfo.CurrentCulture.TextInfo.ToTitleCase(_input));
+
+                                    trailername += String.Format(trailerDefExtra[lCounter], CultureInfo.CurrentCulture.TextInfo.ToTitleCase(_input));
                                 }
 
-                                iCounter++;
+                                lCounter++;
                             }
 
                             tmpTrailerName = trailername;
@@ -289,27 +350,36 @@ namespace TS_SE_Tool
                     }
 
                     //Driver
-                    tmpDriverName = UserDriverDictionary.Where(tX => tX.Value.AssignedTrailer == trailerNameless)?.SingleOrDefault().Key ?? "null";
-                    
-                    if (tmpDriverName != "null")
+                    tmpDriverName = UserDriverDictionary.Where(x => x.Value.AssignedTrailer == trailerNameless)?.SingleOrDefault().Key ?? "null";
+
+                    if (!String.IsNullOrEmpty(tmpDriverName) && tmpDriverName != "null")
+                    {
                         if (SiiNunitData.Player.drivers[0] == tmpDriverName)
                         {
                             tmpDriverName = "> " + Utilities.TextUtilities.FromHexToString(Globals.SelectedProfile);
                         }
                         else
                         {
-                            DriverNames.TryGetValue(tmpDriverName, out string _resultvalue);
-
-                            if (_resultvalue != null && _resultvalue != "")
+                            if (DriverNames.TryGetValue(tmpDriverName, out string _resultvalue))
                             {
-                                tmpDriverName = _resultvalue.TrimStart(new char[] { '+' });
-                            }
+                                if (!string.IsNullOrEmpty(_resultvalue))
+                                {
+                                    tmpDriverName = _resultvalue.TrimStart(new char[] { '+' });
+                                }
+                            }  
                         }
+                    }
 
                     //
-                    combDT.Rows.Add(trailerNameless, tmpTrailerType, tmpTrailerName, tmpGarageName, tmpDriverName);
+                    combDT.Rows.Add(trailerNameless, tmpTrailerType, tmpTrailerName, tmpGarageName, tmpDriverName, tmpTruckState);
                 }
             }
+
+            combDT.DefaultView.Sort = "TrailerState, GarageName, TrailerName";
+
+            comboBoxUserTrailerCompanyTrailers.ValueMember = "UserTrailerNameless";
+            comboBoxUserTrailerCompanyTrailers.DisplayMember = "DisplayMember";
+            comboBoxUserTrailerCompanyTrailers.DataSource = combDT;
 
             if (combDT.Rows.Count > 1)
             {
@@ -319,10 +389,6 @@ namespace TS_SE_Tool
             {
                 comboBoxUserTrailerCompanyTrailers.Enabled = false;
             }
-
-            comboBoxUserTrailerCompanyTrailers.ValueMember = "UserTrailerNameless";
-            comboBoxUserTrailerCompanyTrailers.DisplayMember = "DisplayMember";
-            comboBoxUserTrailerCompanyTrailers.DataSource = combDT;
 
             comboBoxUserTrailerCompanyTrailers.SelectedValue = SiiNunitData.Player.assigned_trailer;
         }
@@ -357,7 +423,9 @@ namespace TS_SE_Tool
 
             if (progressBarPanel != null)
             {
-                float _wear = 0;
+                float _wear = 0,
+                      _unfixableWear = 0,
+                      _permanentWear = 0;
                 string partType = "";
 
                 // Get part type
@@ -368,19 +436,42 @@ namespace TS_SE_Tool
                         case 0:
                             partType = "cargo";
                             _wear = SelectedUserCompanyTrailer.TrailerMainData.cargo_damage;
-                            break;                            
+                            break;  
+                            
                         case 1:
                             partType = "body";
                             _wear = SelectedUserCompanyTrailer.TrailerMainData.trailer_body_wear;
+
+                            if (MainSaveFileInfoData.Version > (byte)saveVTV.v148)
+                            {
+                                _unfixableWear = SelectedUserCompanyTrailer.TrailerMainData.trailer_body_wear_unfixable;
+                            }
+
                             break;
+
                         case 2:
                             partType = "chassis";
                             _wear = SelectedUserCompanyTrailer.TrailerMainData.chassis_wear;
+
+                            if (MainSaveFileInfoData.Version > (byte)saveVTV.v148)
+                            {
+                                _unfixableWear = SelectedUserCompanyTrailer.TrailerMainData.chassis_wear_unfixable;
+                            }
+
                             break;
+
                         case 3:
                             partType = "tire";
                             if (SelectedUserCompanyTrailer.TrailerMainData.wheels_wear.Count > 0)
                                 _wear = SelectedUserCompanyTrailer.TrailerMainData.wheels_wear.Sum() / SelectedUserCompanyTrailer.TrailerMainData.wheels_wear.Count;
+
+                            if (MainSaveFileInfoData.Version > (byte)saveVTV.v148)
+                            {
+                                if (SelectedUserCompanyTrailer.TrailerMainData.wheels_wear_unfixable.Count > 0)
+                                    _unfixableWear = SelectedUserCompanyTrailer.TrailerMainData.wheels_wear_unfixable.Sum() / 
+                                                     SelectedUserCompanyTrailer.TrailerMainData.wheels_wear_unfixable.Count;
+                            }
+
                             break;
                     }
                 }
@@ -390,7 +481,14 @@ namespace TS_SE_Tool
                     return;
                 }
 
-                //=== Label
+                // 1.49 
+
+                _permanentWear = (float)SelectedUserCompanyTrailer.TrailerMainData.integrity_odometer / 5000000;
+
+                //
+
+                // Part name
+
                 if (partLabel != null)
                 {
                     string pnlText = SetTrailerPartLabelText(trailerNameless, SelectedUserCompanyTrailer.TrailerMainData, partType);
@@ -412,38 +510,105 @@ namespace TS_SE_Tool
                 //===
 
                 //=== Repair button
-                if (_wear == 0)
+
+                if (_wear == 0 && _unfixableWear == 0 && _permanentWear == 0)
                     repairButton.Enabled = false;
                 else
                     repairButton.Enabled = true;
+
                 //===
 
-                //=== Progress bar
-                SolidBrush ppen = new SolidBrush(GetProgressbarColor(_wear));
+                float totalWear = _wear + _unfixableWear + _permanentWear;
 
-                int x = 0, y = 0, pnlwidth = (int)(progressBarPanel.Width * (1 - _wear));
+                //=== Progress bar
+
+                SolidBrush ppen = new SolidBrush(Graphics_TSSET.GetProgressbarColor(totalWear));
+
+                int x = 0, y = 0, 
+                    pnlWidth = (int)(progressBarPanel.Width * (1 - (totalWear)));
 
                 Bitmap progress = new Bitmap(progressBarPanel.Width, progressBarPanel.Height);
 
-                Graphics g = Graphics.FromImage(progress);
-                g.FillRectangle(ppen, x, y, pnlwidth, progressBarPanel.Height);
+                using (Graphics g = Graphics.FromImage(progress))
+                {
+                    g.SmoothingMode = SmoothingMode.HighQuality;
+                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
 
-                int fontSize = 12;
-                StringFormat sf = new StringFormat();
-                sf.LineAlignment = StringAlignment.Center;
-                sf.Alignment = StringAlignment.Center;
+                    g.FillRectangle(ppen, x, y, pnlWidth, progressBarPanel.Height);
 
-                GraphicsPath p = new GraphicsPath();
-                p.AddString(
-                    ((int)((1 - _wear) * 100)).ToString() + " %",   // text to draw
-                    FontFamily.GenericSansSerif,                    // or any other font family
-                    (int)FontStyle.Bold,                            // font style (bold, italic, etc.)
-                    g.DpiY * fontSize / 72,                         // em size
-                    new Rectangle(0, 0, progressBarPanel.Width, progressBarPanel.Height),     // location where to draw text
-                    sf);                                            // set options here (e.g. center alignment)
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                g.FillPath(Brushes.Black, p);
-                g.DrawPath(Pens.Black, p);
+                    int pnlWidthFixable = (int)(progressBarPanel.Width * _wear);
+
+                    using (TextureBrush brush = new TextureBrush(VehicleIntegrityPBImg[0], WrapMode.Tile))
+                    {
+                        SolidBrush wearPen = new SolidBrush(Color.Yellow);
+                        g.FillRectangle(wearPen, pnlWidth, 0, pnlWidthFixable, progressBarPanel.Height);
+
+                        brush.TranslateTransform(pnlWidth, -4);
+                        g.FillRectangle(brush, pnlWidth, 0, pnlWidthFixable, progressBarPanel.Height);
+                    }
+
+                    if (MainSaveFileInfoData.Version > (byte)saveVTV.v148)
+                    {
+                        //1.49
+
+                        int pnlWidthUnfixable = (int)(progressBarPanel.Width * _unfixableWear);
+
+                        using (TextureBrush brush = new TextureBrush(VehicleIntegrityPBImg[1], WrapMode.Tile))
+                        {
+                            SolidBrush wearPen = new SolidBrush(Color.Orange);
+                            g.FillRectangle(wearPen, pnlWidth + pnlWidthFixable, 0, pnlWidthUnfixable, progressBarPanel.Height);
+
+                            brush.TranslateTransform(pnlWidth + pnlWidthFixable, 0);
+                            g.FillRectangle(brush, pnlWidth + pnlWidthFixable, 0, pnlWidthUnfixable, progressBarPanel.Height);
+                        }
+
+
+                        int pnlWidthPermanent = (int)(progressBarPanel.Width * _permanentWear);
+
+                        using (TextureBrush brush = new TextureBrush(VehicleIntegrityPBImg[2], WrapMode.Tile))
+                        {
+                            SolidBrush wearPen = new SolidBrush(Color.Red);
+                            g.FillRectangle(wearPen, pnlWidth + pnlWidthFixable + pnlWidthUnfixable, 0, pnlWidthPermanent, progressBarPanel.Height);
+
+                            brush.TranslateTransform(progressBarPanel.Width - (pnlWidthPermanent), 0);
+                            g.FillRectangle(brush, progressBarPanel.Width - (pnlWidthPermanent), 0, pnlWidthPermanent, progressBarPanel.Height);
+                        }
+
+                        //1.49
+                    }
+
+                    int fontSize = 14;
+
+                    string textPercent = ((int)((1 - totalWear) * 100)).ToString() + " %";
+                    Font percentFont = new Font(FontFamily.GenericSansSerif, fontSize, FontStyle.Bold);
+
+                    var textSize = g.MeasureString(textPercent, percentFont);
+
+                    // Percent background
+
+                    SolidBrush pbPen = new SolidBrush(Color.FromArgb(200, Color.White));
+                    g.FillRectangle(pbPen, (progressBarPanel.ClientRectangle.Width - textSize.Width) / 2,
+                                           (progressBarPanel.ClientRectangle.Height - textSize.Height) / 2, textSize.Width, textSize.Height);
+
+                    //
+
+                    StringFormat sf = new StringFormat();
+                    sf.LineAlignment = StringAlignment.Center;
+                    sf.Alignment = StringAlignment.Center;
+
+                    GraphicsPath p = new GraphicsPath();
+
+                    p.AddString(
+                        textPercent,                    // text to draw
+                        percentFont.FontFamily,         // or any other font family
+                        (int)percentFont.Style,         // font style (bold, italic, etc.)
+                        fontSize,                       // em size
+                        new Rectangle(0, 0, progressBarPanel.Width, progressBarPanel.Height),     // location where to draw text
+                        sf);                            // set options here (e.g. center alignment)
+
+                    g.FillPath(Brushes.Black, p);
+                    g.DrawPath(Pens.Black, p);
+                }
 
                 progressBarPanel.BackgroundImage = progress;
                 //===
@@ -615,7 +780,7 @@ namespace TS_SE_Tool
             Panel lpPanel = groupBoxUserTrailerTrailerDetails.Controls.Find("TrailerLicensePlateIMG", true).FirstOrDefault() as Panel;
 
             if (lpPanel != null)
-                lpPanel.BackgroundImage = Utilities.TS_Graphics.ResizeImage(thisLP.LicensePlateIMG, LicensePlateWidth[GameType], 32);
+                lpPanel.BackgroundImage = Graphics_TSSET.ResizeImage(thisLP.LicensePlateIMG, LicensePlateWidth[GameType], 32);
         }
 
         //Events
@@ -627,11 +792,11 @@ namespace TS_SE_Tool
             {
                 ToggleTrailerPartsCondition(true);
 
-                buttonUserTrailerSelectCurrent.Enabled = true;
-                tableLayoutPanelUserTrailerControls.Enabled = true;
-
                 groupBoxUserTrailerTrailerDetails.Enabled = true;
                 groupBoxUserTrailerShareTrailerSettings.Enabled = true;
+
+                buttonUserTrailerSelectCurrent.Enabled = true;
+                tableLayoutPanelUserTrailerControls.Enabled = true;
 
                 UpdateTrailerPanelDetails();
             }
@@ -639,13 +804,13 @@ namespace TS_SE_Tool
             {
                 ToggleTrailerPartsCondition(false);
 
+                groupBoxUserTrailerTrailerDetails.Enabled = false;
+                groupBoxUserTrailerShareTrailerSettings.Enabled = false;
+
                 if (!comboBoxUserTrailerCompanyTrailers.Enabled)
                     buttonUserTrailerSelectCurrent.Enabled = false;
 
                 tableLayoutPanelUserTrailerControls.Enabled = false;
-
-                groupBoxUserTrailerTrailerDetails.Enabled = false;
-                groupBoxUserTrailerShareTrailerSettings.Enabled = false;
             }
         }
         
@@ -673,7 +838,7 @@ namespace TS_SE_Tool
                 if (_state)
                     tmpButtonRepair.BackgroundImage = RepairImg;
                 else
-                    tmpButtonRepair.BackgroundImage = ConvertBitmapToGrayscale(RepairImg);
+                    tmpButtonRepair.BackgroundImage = Graphics_TSSET.ConvertBitmapToGrayscale(RepairImg);
             }
         }
 
@@ -681,8 +846,8 @@ namespace TS_SE_Tool
         {
             Control tmpControl;
 
-            string[] buttons = { "buttonTrailerRepair", "buttonTrailerInfo" };
-            Image[] images = { RepairImg, CustomizeImg };
+            string[] buttons = { "buttonTrailerRepair", "buttonTrailerInfo", "buttonTrailerLicensePlateEdit" };
+            Image[] images = { RepairImg, CustomizeImg, CustomizeImg };
 
             for (int i = 0; i < buttons.Count(); i++)
             {
@@ -692,13 +857,13 @@ namespace TS_SE_Tool
                 }
                 catch
                 {
-                    break;
+                    continue;
                 }
 
                 if (_state && tmpControl.Enabled)
                     tmpControl.BackgroundImage = images[i];
                 else
-                    tmpControl.BackgroundImage = ConvertBitmapToGrayscale(images[i]);
+                    tmpControl.BackgroundImage = Graphics_TSSET.ConvertBitmapToGrayscale(images[i]);
             }
         }
         
@@ -750,25 +915,33 @@ namespace TS_SE_Tool
         public void buttonTrailerRepair_Click(object sender, EventArgs e)
         {
             string trailerNameless = "", slaveTrailerNameless = "";
+            Save.Items.Trailer selectedTrailerData;
 
             trailerNameless = comboBoxUserTrailerCompanyTrailers.SelectedValue.ToString();
+            slaveTrailerNameless = trailerNameless;
 
-            StartTrailerParts:
-
-            Save.Items.Trailer selectedTrailerData = UserTrailerDictionary[trailerNameless].TrailerMainData;
-
-            selectedTrailerData.cargo_damage = 0;
-            selectedTrailerData.trailer_body_wear = 0;
-            selectedTrailerData.chassis_wear = 0;
-            selectedTrailerData.wheels_wear = new List<Save.DataFormat.SCS_Float>();
-
-            slaveTrailerNameless = UserTrailerDictionary[trailerNameless].TrailerMainData.slave_trailer;
-
-            if (slaveTrailerNameless != "null")
+            do
             {
-                trailerNameless = slaveTrailerNameless;
-                goto StartTrailerParts;
-            }
+                selectedTrailerData = SiiNunitData.SiiNitems[slaveTrailerNameless];
+
+                selectedTrailerData.cargo_damage = 0;
+                selectedTrailerData.trailer_body_wear = 0;
+                selectedTrailerData.chassis_wear = 0;
+                selectedTrailerData.wheels_wear = new List<Save.DataFormat.SCS_Float>();
+
+                selectedTrailerData.trailer_body_wear_unfixable = 0;
+                selectedTrailerData.chassis_wear_unfixable = 0;
+                selectedTrailerData.wheels_wear_unfixable = new List<Save.DataFormat.SCS_Float>();
+
+                selectedTrailerData.integrity_odometer = 0;
+                selectedTrailerData.integrity_odometer_float_part = 0;
+
+                slaveTrailerNameless = selectedTrailerData.slave_trailer;
+
+                if (slaveTrailerNameless == "null")
+                    break;
+
+            } while (true);
 
             for (byte i = 0; i < 5; i++)
                 UpdateTrailerPanelProgressBar(i);
@@ -799,39 +972,44 @@ namespace TS_SE_Tool
 
             //
             string trailerNameless = "", slaveTrailerNameless = "";
+            Save.Items.Trailer selectedTrailerData;
 
             trailerNameless = comboBoxUserTrailerCompanyTrailers.SelectedValue.ToString();
+            slaveTrailerNameless = trailerNameless;
 
-            Save.Items.Trailer selectedTrailerData = UserTrailerDictionary[trailerNameless].TrailerMainData;
-
-            StartTrailerParts:
-
-            switch (buttonIndex)
+            do
             {
-                case 0:
-                    selectedTrailerData.cargo_damage = 0;
+                selectedTrailerData = SiiNunitData.SiiNitems[slaveTrailerNameless];
+
+                switch (buttonIndex)
+                {
+                    case 0:
+                        selectedTrailerData.cargo_damage = 0;
+                        break;
+
+                    case 1:
+                        selectedTrailerData.trailer_body_wear = 0;
+                        selectedTrailerData.trailer_body_wear_unfixable = 0;
+
+                        break;
+
+                    case 2:
+                        selectedTrailerData.chassis_wear = 0;
+                        selectedTrailerData.chassis_wear_unfixable = 0;
+                        break;
+
+                    case 3:
+                        selectedTrailerData.wheels_wear = new List<Save.DataFormat.SCS_Float>();
+                        selectedTrailerData.wheels_wear_unfixable = new List<Save.DataFormat.SCS_Float>();
+                        break;
+                }
+
+                slaveTrailerNameless = selectedTrailerData.slave_trailer;
+
+                if (slaveTrailerNameless == "null")
                     break;
 
-                case 1:
-                    selectedTrailerData.trailer_body_wear = 0;
-                    break;
-
-                case 2:
-                    selectedTrailerData.chassis_wear = 0;
-                    break;
-
-                case 3:
-                    selectedTrailerData.wheels_wear = new List<Save.DataFormat.SCS_Float>();
-                    break;
-            }
-
-            slaveTrailerNameless = UserTrailerDictionary[trailerNameless].TrailerMainData.slave_trailer;
-
-            if (slaveTrailerNameless != "null")
-            {
-                trailerNameless = slaveTrailerNameless;
-                goto StartTrailerParts;
-            }
+            } while (true);
 
             UpdateTrailerPanelProgressBar(buttonIndex);
 
@@ -845,7 +1023,7 @@ namespace TS_SE_Tool
             if (tmpButton.Enabled)
                 tmpButton.BackgroundImage = RepairImg;
             else
-                tmpButton.BackgroundImage = ConvertBitmapToGrayscale(RepairImg);
+                tmpButton.BackgroundImage = Graphics_TSSET.ConvertBitmapToGrayscale(RepairImg);
         }
 
         //end User Trailer tab

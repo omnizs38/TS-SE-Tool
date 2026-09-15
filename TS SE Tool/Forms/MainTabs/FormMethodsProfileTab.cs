@@ -16,6 +16,8 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Collections.Generic;
+using TS_SE_Tool.Utilities;
 
 namespace TS_SE_Tool
 {
@@ -115,6 +117,8 @@ namespace TS_SE_Tool
 
             char[] ADR = Convert.ToString(SiiNunitData.Economy.adr, 2).PadLeft(6, '0').ToCharArray();
 
+            Array.Reverse(ADR);
+
             for (int i = 0; i < ADR.Length; i++)
             {
                 if (ADR[i] == '1')
@@ -162,7 +166,7 @@ namespace TS_SE_Tool
         private void CreateUserColorsButtons()
         {
             int padding = 3, width = 24, height = 24, spacing = 4;
-            int usableSpace = groupBoxProfileUserColors.Bounds.Width;
+            int usableSpace = groupBoxProfileUserColorsShort.Bounds.Width;
                         
             if (MainSaveFileInfoData.Version >= 49)
             {
@@ -268,8 +272,6 @@ namespace TS_SE_Tool
             {
                 int padding = 3, width = 24, height = 24, spacing = 4;
 
-                panelProfileUserColors.VerticalScroll.Maximum = (height + spacing) * SiiNunitData.Economy.user_colors.Count / 4;
-
                 for (int i = 0; i < SiiNunitData.Economy.user_colors.Count; i++)
                 {
                     Button btn = null;
@@ -279,18 +281,7 @@ namespace TS_SE_Tool
                     {
                         btn = panelProfileUserColors.Controls[btnname] as Button;
 
-                        btn.Enabled = true;
-
-                        if (SiiNunitData.Economy.user_colors[i].color.A == 0)
-                        {
-                            btn.Text = "X";
-                            btn.BackColor = Color.FromName("Control");
-                        }
-                        else
-                        {
-                            btn.Text = "";
-                            btn.BackColor = SiiNunitData.Economy.user_colors[i].color;
-                        }
+                        applyButtonVisuals(btn, i);
                     }
                     else
                     {
@@ -312,23 +303,29 @@ namespace TS_SE_Tool
 
                             panelProfileUserColors.Controls.Add(btn);
 
-                            btn.Enabled = true;
+                            applyButtonVisuals(btn, i);
 
-                            if (SiiNunitData.Economy.user_colors[i].color.A == 0)
-                            {
-                                btn.Text = "X";
-                                btn.BackColor = Color.FromName("Control");
-                            }
-                            else
-                            {
-                                btn.Text = "";
-                                btn.BackColor = SiiNunitData.Economy.user_colors[i].color;
-                            }
                             i++;
                         }
+
                         i--;
                     }
-                }                
+                }
+
+                //Scroll panel to the top to properly add buttons
+                panelProfileUserColors.AutoScrollPosition = new Point(0, 0);
+
+                panelProfileUserColors.VerticalScroll.Maximum = (height + spacing) * SiiNunitData.Economy.user_colors.Count / 4;
+
+                //Return to top position
+                int location = panelProfileUserColors.VerticalScroll.Maximum - panelProfileUserColors.Height;
+
+                if (location > 0)
+                {
+                    panelProfileUserColors.AutoScrollPosition = new Point(0, location);
+                    panelProfileUserColors.VerticalScroll.Value = location;
+                }
+                //
             }
             else
             {
@@ -358,18 +355,24 @@ namespace TS_SE_Tool
 
                     if (btn != null)
                     {
-                        btn.Enabled = true;
-                        if (SiiNunitData.Economy.user_colors[i].color.A == 0)
-                        {
-                            btn.Text = "X";
-                            btn.BackColor = Color.FromName("Control");
-                        }
-                        else
-                        {
-                            btn.Text = "";
-                            btn.BackColor = SiiNunitData.Economy.user_colors[i].color;
-                        }
+                        applyButtonVisuals(btn, i);
                     }
+                }
+            }
+
+            void applyButtonVisuals(Button _btn, int _idx)
+            {
+                _btn.Enabled = true;
+
+                if (SiiNunitData.Economy.user_colors[_idx].color.A == 0)
+                {
+                    _btn.Text = "X";
+                    _btn.BackColor = Color.FromKnownColor(KnownColor.Control);
+                }
+                else
+                {
+                    _btn.Text = "";
+                    _btn.BackColor = SiiNunitData.Economy.user_colors[_idx].color;
                 }
             }
         }
@@ -426,12 +429,16 @@ namespace TS_SE_Tool
                 else
                 {
                     obj.Text = "X";
-                    obj.BackColor = Color.FromName("Control");
+                    obj.BackColor = Color.FromKnownColor(KnownColor.Control);
                 }
             }
 
             if (MainSaveFileInfoData.Version >= 49)
+            {
                 RemoveUserColorUnused4slot();
+                RemoveUserColorUnused4slotUI();
+                UpdateUserColorsButtons();
+            }
         }
 
         private void buttonAddUserColor_Click(object sender, EventArgs e)
@@ -493,18 +500,7 @@ namespace TS_SE_Tool
                         for (int i = 4; i > 0; i--)
                         {
                             int btnNumber = counter + i;
-
-                            Control[] tempArray = panelProfileUserColors.Controls.Find("buttonUC" + btnNumber.ToString(), false);
-
-                            if (tempArray.Length > 0)
-                            {
-                                panelProfileUserColors.Controls.Remove(tempArray[0]);
-                                SiiNunitData.Economy.user_colors.RemoveAt(btnNumber);
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            SiiNunitData.Economy.user_colors.RemoveAt(btnNumber);
                         }
                     }
                     else
@@ -512,29 +508,30 @@ namespace TS_SE_Tool
                         break;
                     }
                 }
-
-                if (SiiNunitData.Economy.user_colors.Count / 4 >= 40)
-                    buttonAddUserColor.Enabled = false;
-                else
-                    buttonAddUserColor.Enabled = true;
-
             }
             catch
             { }
+        }
 
-            //Scroll panel to the top to properly add buttons
-            panelProfileUserColors.AutoScrollPosition = new Point(0, 0);
+        internal void RemoveUserColorUnused4slotUI()
+        {
+            List<string> btnList = new List<string>();
 
-            UpdateUserColorsButtons();
-
-            //Return to top position
-            int location = panelProfileUserColors.VerticalScroll.Maximum - panelProfileUserColors.Height;
-
-            if (location > 0)
+            foreach (Control ctrl in panelProfileUserColors.Controls)
             {
-                panelProfileUserColors.AutoScrollPosition = new Point(0, location);
-                panelProfileUserColors.VerticalScroll.Value = location;
+                btnList.Add(ctrl.Name.Substring(8, ctrl.Name.Length - 8));
             }
+
+            foreach (string btnNumber in btnList)
+            {
+                if (int.Parse(btnNumber) >= SiiNunitData.Economy.user_colors.Count)
+                    panelProfileUserColors.Controls.Remove(panelProfileUserColors.Controls.Find("buttonUC" + btnNumber.ToString(), false)[0]);
+            }
+
+            if (SiiNunitData.Economy.user_colors.Count / 4 >= 40)
+                buttonAddUserColor.Enabled = false;
+            else
+                buttonAddUserColor.Enabled = true;
         }
 
         //Profile buttons
@@ -664,25 +661,22 @@ namespace TS_SE_Tool
         {
             CheckBox thisbutton = sender as CheckBox;
 
-            byte adrIndex = byte.Parse(thisbutton.Name.Substring(9, 1));
-            char[] ADR = Convert.ToString(SiiNunitData.Economy._playerSkills[0], 2).PadLeft(6, '0').ToCharArray();
-
-            if (thisbutton.Checked)
+            if (TextUtilities.ExtractFirstNumber(thisbutton.Name, out int number))
             {
-                ADR[adrIndex] = '1';
+                char[] ADR = Convert.ToString(SiiNunitData.Economy._playerSkills[0], 2).PadLeft(6, '0').ToCharArray();
 
+                Array.Reverse(ADR);
+
+                if (thisbutton.Checked)
+                    ADR[number] = '1';
+                else
+                    ADR[number] = '0';
+
+                Array.Reverse(ADR);
                 SiiNunitData.Economy._playerSkills[0] = Convert.ToByte(new string(ADR), 2);
-            }
-            else
-            {
-                ADR[adrIndex] = '0';
 
-                string temp = new string(ADR);
-
-                SiiNunitData.Economy._playerSkills[0] = Convert.ToByte(temp.PadLeft(6, '0'), 2);
-            }
-
-            thisbutton.BackgroundImage = SkillImgSBG[1];
+                thisbutton.BackgroundImage = SkillImgSBG[1];
+            }            
         }
 
         private void ADRbutton_CheckedChanged(object sender, EventArgs e)
