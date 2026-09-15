@@ -55,7 +55,6 @@ jobs:
         run: >-
           msbuild "$env:SOLUTION_FILE"
           /m
-          /restore:false
           /p:Configuration=$env:BUILD_CONFIGURATION
           /p:Platform="Any CPU"
           /p:ContinuousIntegrationBuild=true
