@@ -1,0 +1,44 @@
+name: Build v97
+
+on:
+  push:
+    branches:
+      - merge/v97
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup nuget@v2
+
+      - name: Restore packages
+        shell: pwsh
+        run: nuget restore "TS SE Tool.sln"
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          msbuild "TS SE Tool.sln" `
+            /t:Rebuild `
+            /p:Configuration=Release `
+            /p:Platform="Any CPU" `
+            /m
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: TS-SE-Tool-v97-merge
+          path: |
+            **/bin/Release/**/*.exe
+            **/bin/Release/**/*.dll
+            **/bin/Release/**/*.config
+          if-no-files-found: error
