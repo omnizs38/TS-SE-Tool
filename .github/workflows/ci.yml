@@ -25,6 +25,10 @@ jobs:
     name: Build
     runs-on: windows-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
 
     steps:
       - name: Check out source
@@ -48,17 +52,17 @@ jobs:
 
       - name: Restore dependencies
         shell: pwsh
-        run: nuget restore "$env:SOLUTION_FILE" -NonInteractive
+        run: |
+          nuget restore "$env:SOLUTION_FILE" -NonInteractive -Verbosity detailed 2>&1 |
+            Tee-Object -FilePath ci-output.log
+          exit $LASTEXITCODE
 
       - name: Build release
         shell: pwsh
-        run: >-
-          msbuild "$env:SOLUTION_FILE"
-          /m
-          /p:Configuration=$env:BUILD_CONFIGURATION
-          /p:Platform="Any CPU"
-          /p:ContinuousIntegrationBuild=true
-          /p:Deterministic=true
+        run: |
+          msbuild "$env:SOLUTION_FILE" /m /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform="Any CPU" /p:ContinuousIntegrationBuild=true /p:Deterministic=true /v:minimal 2>&1 |
+            Tee-Object -FilePath ci-output.log -Append
+          exit $LASTEXITCODE
 
       - name: Verify distributable
         shell: pwsh
@@ -75,6 +79,27 @@ jobs:
           path: TS SE Tool/bin/Release/**
           if-no-files-found: error
           retention-days: 14
+
+      - name: Report failure details
+        if: failure() && github.event_name == 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $log = if (Test-Path ci-output.log) {
+            (Get-Content ci-output.log -Tail 120) -join "`n"
+          } else {
+            "The build failed before a restore/build log was created."
+          }
+          $body = @"
+          <!-- ci-diagnostic-${{ github.run_id }} -->
+          **CI diagnostic** ([run ${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}))
+
+          ````text
+          $log
+          ````
+          "@
+          gh pr comment ${{ github.event.pull_request.number }} --body $body
 
   release:
     name: Publish release
