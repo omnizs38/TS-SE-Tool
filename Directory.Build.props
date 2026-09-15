@@ -3,7 +3,6 @@
     <LangVersion>latest</LangVersion>
     <WarningLevel>4</WarningLevel>
     <Deterministic>true</Deterministic>
-    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/omnizs38/TS-SE-Tool</RepositoryUrl>
     <Authors>omnizs38 and contributors</Authors>

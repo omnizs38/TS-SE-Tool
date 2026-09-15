@@ -60,7 +60,7 @@ jobs:
       - name: Build release
         shell: pwsh
         run: |
-          msbuild "$env:SOLUTION_FILE" /m /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform="Any CPU" /p:ContinuousIntegrationBuild=true /p:Deterministic=true /v:minimal 2>&1 |
+          msbuild "$env:SOLUTION_FILE" /m /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform="Any CPU" /p:Deterministic=true /v:minimal 2>&1 |
             Tee-Object -FilePath ci-output.log -Append
           exit $LASTEXITCODE
 
