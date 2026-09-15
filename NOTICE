@@ -1,0 +1,14 @@
+TS SE Tool
+
+Original work copyright 2016–2022 LIPtoH and contributors.
+Maintenance modifications copyright 2026 omnizs38 and contributors.
+
+This product includes software developed by third parties, including:
+
+- SII_Decrypt by František Milt, licensed under MPL-2.0.
+- SharpZipLib contributors, licensed under the MIT License.
+- SqlCeBulkCopy by ErikEJ and contributors, licensed under the MIT License.
+- Microsoft SQL Server Compact redistributable components, subject to their applicable Microsoft terms.
+- PsColorPicker, DDSImageParser, TGASharpLib, and FlexibleMessageBox components or derived code, subject to their respective notices and licenses.
+
+The complete Apache-2.0 terms and the notices carried forward from the original distribution are in LICENSE. This NOTICE is informational and does not change any license.

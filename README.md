@@ -1,51 +1,59 @@
-# TS SET
-Truck Simulator Save Editor Tool
+# TS SE Tool
 
-## Description
-Small tool for editing save files of Euro Truck Simulator 2 and American Truck Simulator.
+A maintained Windows save editor for **Euro Truck Simulator 2** and **American Truck Simulator**.
 
-## OS
-Windows x64
+> [!WARNING]
+> Always back up a profile before writing a save. Game updates can introduce fields that older editor builds do not understand.
 
-### Dependence
-.NET Framework 4.8
+## Project status
+
+This repository is the maintained source of the project. Runtime links, update instructions, CI, and release artifacts point only to `omnizs38/TS-SE-Tool`.
+
+The current save pipeline supports save-file versions **61–97** and preserves unmodelled fields during a load → save round trip. ETS2/ATS 1.60–1.61 saves use version 97. Newer game versions must be treated as unverified until tested with real profiles.
+
+The legacy in-app updater has been removed. Install updates manually from this repository's **GitHub Releases** page; builds never download and overwrite application files in the background.
+
+## Features
+
+- Edit local and Steam profiles and saves
+- Edit player level, skills, money, cities, and garages
+- Repair/refuel trucks and trailers
+- Create freight-market jobs and make basic cargo-market edits
+- Import/export colors, paint jobs, positions, and GPS routes
+- Run a headless save round-trip diagnostic with `--selftest`
+
+## Requirements
+
+- Windows 10 or Windows 11, x64
+- .NET Framework 4.8 or newer 4.x runtime
+- Visual Studio 2022 with the **.NET desktop development** workload for local builds
+
+The application remains on .NET Framework because SQL Server Compact and the native save decoder are Windows-only legacy dependencies. Moving to modern .NET requires replacing those components first; changing the target alone would create a non-working build.
 
 ## Build
-The project is built automatically on Windows via GitHub Actions.
 
-* Every push and pull request to `master`/`main` triggers a Release build and uploads the `.exe` (with dependencies) as a workflow artifact.
-* Pushing a version tag (e.g. `v0.3.1`) builds a Release and publishes a packaged `.zip` to GitHub Releases.
-
-To build locally you need Visual Studio 2019+ (or MSBuild) with the .NET Framework 4.8 targeting pack:
-
-```
-nuget restore "TS SE Tool.sln"
-msbuild "TS SE Tool.sln" /p:Configuration=Release
+```powershell
+nuget restore "TS SE Tool.sln" -NonInteractive
+msbuild "TS SE Tool.sln" /m /p:Configuration=Release /p:Platform="Any CPU"
 ```
 
-## You can:
-* add Custom paths for save files.
-* edit Local and Steam save files.
-* edit Player level and skill.
-* edit and share saved User Colors for truck and trailer.
-* edit amount of Money on account.
-* visit Cities and be able to grab cargo from discovered cities.
-* buy and\or upgrade Garages.
-* repair and\or refuel your Truck.
-* Share truck paint job.
-* repair Trailer.
-* create custom jobs for Freight market.
-* make basic edits to Cargo market.
-* share Truck position.
-* share GPS paths.
-* share Multiple Truck positions as one Convoy Control pack.
+The executable and runtime files are written to `TS SE Tool/bin/Release`.
 
-## Short term goals:
-* finish sharing functions for truck parts.
-* add editing and share functions for trailers.
- 
+## Diagnostic round trip
 
-## Long term goals:
-* add the ability to creat jobs for Cargo market (have couple ideas)
-* get map data from game\game generated files.
-* scan mods for data (trucks, cargo...)
+```powershell
+& ".\TS SE Tool.exe" --selftest "C:\path\to\profile\save\slot" "C:\temp\tsset-report"
+```
+
+The diagnostic does not write into the source save directory. Do not attach personal save data to public issues; share only a minimized, sanitized reproduction.
+
+## Releases and support
+
+- Releases: <https://github.com/omnizs38/TS-SE-Tool/releases>
+- Bugs and feature requests: <https://github.com/omnizs38/TS-SE-Tool/issues>
+- Security reports: see [SECURITY.md](SECURITY.md)
+- Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## License and attribution
+
+Licensed under Apache-2.0. Required upstream and third-party attribution is retained in [LICENSE](LICENSE) and [NOTICE](NOTICE); stale runtime branding and update endpoints are not.

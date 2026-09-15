@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOLUTION_FILE: TS SE Tool.sln
+  BUILD_CONFIGURATION: Release
+
+jobs:
+  build:
+    name: Build
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Set up NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/packages.config') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore dependencies
+        shell: pwsh
+        run: nuget restore "$env:SOLUTION_FILE" -NonInteractive
+
+      - name: Build release
+        shell: pwsh
+        run: >-
+          msbuild "$env:SOLUTION_FILE"
+          /m
+          /restore:false
+          /p:Configuration=$env:BUILD_CONFIGURATION
+          /p:Platform="Any CPU"
+          /p:ContinuousIntegrationBuild=true
+          /p:Deterministic=true
+
+      - name: Verify distributable
+        shell: pwsh
+        run: |
+          $exe = "TS SE Tool/bin/Release/TS SE Tool.exe"
+          if (-not (Test-Path $exe)) {
+            throw "Expected executable was not produced: $exe"
+          }
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: TS-SE-Tool-${{ github.sha }}
+          path: TS SE Tool/bin/Release/**
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download verified build
+        uses: actions/download-artifact@v4
+        with:
+          name: TS-SE-Tool-${{ github.sha }}
+          path: release-package
+
+      - name: Create release archive
+        shell: pwsh
+        run: |
+          $archive = "TS-SE-Tool-${{ github.ref_name }}.zip"
+          Compress-Archive -Path "release-package/*" -DestinationPath $archive -Force
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: TS-SE-Tool-${{ github.ref_name }}.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
