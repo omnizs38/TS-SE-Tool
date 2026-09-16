@@ -1,11 +1,9 @@
-name: CI
+name: Windows build and release
 
 on:
   push:
-    branches:
-      - master
-    tags:
-      - "v*"
+    branches: [master]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -13,22 +11,23 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: windows-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   SOLUTION_FILE: TS SE Tool.sln
   BUILD_CONFIGURATION: Release
+  STABLE_VERSION: 1.61.1
 
 jobs:
   build:
-    name: Build
-    runs-on: windows-latest
-    timeout-minutes: 20
+    name: Windows 2025 portable and setup
+    runs-on: windows-2025
+    timeout-minutes: 30
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
 
@@ -43,10 +42,9 @@ jobs:
         with:
           path: packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/packages.config') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
+          restore-keys: nuget-${{ runner.os }}-
 
-      - name: Restore dependencies
+      - name: Restore current dependencies
         shell: pwsh
         run: nuget restore "$env:SOLUTION_FILE" -NonInteractive
 
@@ -59,47 +57,131 @@ jobs:
           /p:Platform="Any CPU"
           /p:Deterministic=true
 
-      - name: Verify distributable
+      - name: Determine package version
         shell: pwsh
         run: |
-          $exe = "TS SE Tool/bin/Release/TS SE Tool.exe"
-          if (-not (Test-Path $exe)) {
-            throw "Expected executable was not produced: $exe"
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          } elseif ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -eq 'refs/heads/master') {
+            $version = $env:STABLE_VERSION
+          } else {
+            $version = "$env:STABLE_VERSION-ci.$env:GITHUB_RUN_NUMBER"
           }
+          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Upload build
+      - name: Assemble portable package
+        shell: pwsh
+        run: ./build/Prepare-Portable.ps1 -PackageVersion $env:PACKAGE_VERSION
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler was not found.' }
+          $source = (Resolve-Path 'artifacts/portable').Path
+          $output = Join-Path $PWD 'artifacts/setup'
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+          & $iscc "/DMyAppVersion=$env:PACKAGE_VERSION" "/DSourceDir=$source" "/DOutputDir=$output" 'installer/TS-SE-Tool.iss'
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        run: |
+          $files = @(
+            Get-ChildItem 'artifacts/TS-SE-Tool-*-portable.zip'
+            Get-ChildItem 'artifacts/setup/*.exe'
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash *$($file.Name)"
+          }
+          if ($lines.Count -ne 2) { throw "Expected two release files, found $($lines.Count)." }
+          $lines | Set-Content 'artifacts/SHA256SUMS.txt' -Encoding ascii
+          Get-Content 'artifacts/SHA256SUMS.txt'
+
+      - name: Upload portable package
         uses: actions/upload-artifact@v4
         with:
-          name: TS-SE-Tool-${{ github.sha }}
-          path: TS SE Tool/bin/Release/**
+          name: TS-SE-Tool-${{ github.sha }}-portable
+          path: artifacts/TS-SE-Tool-*-portable.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload setup package
+        uses: actions/upload-artifact@v4
+        with:
+          name: TS-SE-Tool-${{ github.sha }}-setup
+          path: artifacts/setup/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: TS-SE-Tool-${{ github.sha }}-checksums
+          path: artifacts/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
 
   release:
-    name: Publish release
-    if: startsWith(github.ref, 'refs/tags/v')
+    name: Publish GitHub release
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/master') }}
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 10
     permissions:
       contents: write
 
     steps:
-      - name: Download verified build
-        uses: actions/download-artifact@v4
-        with:
-          name: TS-SE-Tool-${{ github.sha }}
-          path: release-package
-
-      - name: Create release archive
+      - name: Select release tag
+        id: release
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $archive = "TS-SE-Tool-${{ github.ref_name }}.zip"
-          Compress-Archive -Path "release-package/*" -DestinationPath $archive -Force
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $tag = $env:GITHUB_REF_NAME
+          } else {
+            $tag = "v$env:STABLE_VERSION"
+          }
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            "publish=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host "Release $tag already exists; leaving it unchanged."
+          } else {
+            "publish=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
 
-      - name: Publish GitHub release
+      - name: Download portable package
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: TS-SE-Tool-${{ github.sha }}-portable
+          path: release
+
+      - name: Download setup package
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: TS-SE-Tool-${{ github.sha }}-setup
+          path: release
+
+      - name: Download checksums
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: TS-SE-Tool-${{ github.sha }}-checksums
+          path: release
+
+      - name: Publish release
+        if: steps.release.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: TS-SE-Tool-${{ github.ref_name }}.zip
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: TS SE Tool ${{ steps.release.outputs.tag }}
+          files: release/*
           generate_release_notes: true
           fail_on_unmatched_files: true

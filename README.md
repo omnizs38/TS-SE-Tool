@@ -7,28 +7,35 @@ A maintained Windows save editor for **Euro Truck Simulator 2** and **American T
 
 ## Project status
 
-This repository is the maintained source of the project. Runtime links, update instructions, CI, and release artifacts point only to `omnizs38/TS-SE-Tool`.
+This repository is the maintained source of TS SE Tool. Runtime links, update checks, CI and release artifacts point only to `omnizs38/TS-SE-Tool`. Required Apache-2.0 and third-party attribution is retained.
 
-The current save pipeline supports save-file versions **61–97** and preserves unmodelled fields during a load → save round trip. ETS2/ATS 1.60–1.61 saves use version 97. Newer game versions must be treated as unverified until tested with real profiles.
-
-The legacy in-app updater has been removed. Install updates manually from this repository's **GitHub Releases** page; builds never download and overwrite application files in the background.
+The save pipeline supports save-file versions **61–97**, preserves unmodelled fields and writes through an atomic temporary file. ETS2/ATS 1.60–1.61 saves use version 97. Newer formats remain unverified until tested with real profiles.
 
 ## Features
 
-- Edit local and Steam profiles and saves
-- Edit player level, skills, money, cities, and garages
-- Repair/refuel trucks and trailers
-- Create freight-market jobs and make basic cargo-market edits
-- Import/export colors, paint jobs, positions, and GPS routes
-- Run a headless save round-trip diagnostic with `--selftest`
+- Edit local, custom-folder and Steam profiles and saves
+- Edit player level, skills, company money, cities, garages, trucks and trailers
+- Generate/edit freight-market jobs
+- Generate, clear, inspect, copy and paste cargo-market offer seeds by company or city
+- Copy/paste truck positions and complete GPS routes
+- Export/import versioned `.tsconvoy` packages and create position variants across saves
+- Safe GitHub Releases update checks (no background download, execution or self-overwrite)
+- Headless save round-trip diagnostic with `--selftest`
+
+## Downloads
+
+Each tagged release produces two Windows packages:
+
+- `TS-SE-Tool-<version>-portable.zip` — extract and run
+- `TS-SE-Tool-<version>-setup.exe` — per-user installer with optional shortcuts
+
+Both are built on GitHub's current `windows-2025` hosted image with the latest Visual Studio/MSBuild image. GitHub does not offer a hosted Windows 11 desktop runner; Windows Server 2025 is the current supported hosted build environment, while the generated application manifest and packages target Windows 10/11 x64-compatible systems.
 
 ## Requirements
 
-- Windows 10 or Windows 11, x64
-- .NET Framework 4.8 or newer 4.x runtime
-- Visual Studio 2022 with the **.NET desktop development** workload for local builds
-
-The application remains on .NET Framework because SQL Server Compact and the native save decoder are Windows-only legacy dependencies. Moving to modern .NET requires replacing those components first; changing the target alone would create a non-working build.
+- Windows 10 or Windows 11, x64-compatible
+- .NET Framework 4.8
+- Visual Studio 2022/2025 build tools with the .NET desktop workload for local builds
 
 ## Build
 
@@ -37,7 +44,7 @@ nuget restore "TS SE Tool.sln" -NonInteractive
 msbuild "TS SE Tool.sln" /m /p:Configuration=Release /p:Platform="Any CPU"
 ```
 
-The executable and runtime files are written to `TS SE Tool/bin/Release`.
+See [DEPENDENCIES.md](DEPENDENCIES.md) for package versions and native-component provenance.
 
 ## Diagnostic round trip
 
@@ -45,15 +52,15 @@ The executable and runtime files are written to `TS SE Tool/bin/Release`.
 & ".\TS SE Tool.exe" --selftest "C:\path\to\profile\save\slot" "C:\temp\tsset-report"
 ```
 
-The diagnostic does not write into the source save directory. Do not attach personal save data to public issues; share only a minimized, sanitized reproduction.
+The diagnostic does not write into the source save directory. Never attach personal save data to public issues; share only a minimized, sanitized reproduction.
 
 ## Releases and support
 
 - Releases: <https://github.com/omnizs38/TS-SE-Tool/releases>
 - Bugs and feature requests: <https://github.com/omnizs38/TS-SE-Tool/issues>
-- Security reports: see [SECURITY.md](SECURITY.md)
-- Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md)
+- Security reports: [SECURITY.md](SECURITY.md)
+- Contributions: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License and attribution
 
-Licensed under Apache-2.0. Required upstream and third-party attribution is retained in [LICENSE](LICENSE) and [NOTICE](NOTICE); stale runtime branding and update endpoints are not.
+Licensed under Apache-2.0. Required upstream and third-party attribution is retained in [LICENSE](LICENSE) and [NOTICE](NOTICE); stale runtime branding, update endpoints and executable updater code are not.

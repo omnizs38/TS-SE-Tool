@@ -1,18 +1,9 @@
 /*
-   Original work copyright 2016-2022 LIPtoH <liptoh.codebase@gmail.com>.
+   Original work copyright 2016-2022 LIPtoH and contributors.
    Maintenance modifications copyright 2026 omnizs38 and contributors.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       https://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
 */
 using System;
 using System.Drawing;
@@ -20,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
+using TS_SE_Tool.Updates;
 using TS_SE_Tool.Utilities;
 
 namespace TS_SE_Tool
@@ -27,15 +19,12 @@ namespace TS_SE_Tool
     public partial class FormSplash : Form
     {
         private readonly FormMain mainForm = Application.OpenForms.OfType<FormMain>().FirstOrDefault();
+        private string releaseUrl = Web_Utilities.ReleasesUrl;
 
         public FormSplash()
         {
             InitializeComponent();
-
-            if (mainForm != null)
-            {
-                mainForm.HelpTranslateFormMethod(this);
-            }
+            if (mainForm != null) mainForm.HelpTranslateFormMethod(this);
 
             labelTSSE.Text = AssemblyData.AssemblyProduct;
             labelVersion.Text = AssemblyData.AssemblyVersion;
@@ -43,51 +32,83 @@ namespace TS_SE_Tool
             buttonSupportDeveloper.Visible = false;
         }
 
-        private void FormSplash_Load(object sender, EventArgs e)
+        private async void FormSplash_Load(object sender, EventArgs e)
         {
-            bool showReleaseLink = true;
-
-            try
-            {
-                showReleaseLink = Properties.Settings.Default.CheckUpdatesOnStartup;
-            }
-            catch (Exception exception)
-            {
-                IO_Utilities.ErrorLogWriter("Could not read update preference: " + exception);
-            }
+            buttonOK.Text = "OK";
+            buttonOK.Click -= buttonOK_Click;
+            buttonOK.Click += buttonOK_Click;
+            linkLabelNewVersion.Click -= linkLabelNewVersion_Click;
+            linkLabelNewVersion.Click += linkLabelNewVersion_Click;
 
             if (mainForm != null && !mainForm.TssetFoldersExist)
             {
                 linkLabelNewVersion.Text = "Installation files are incomplete. Reinstall the latest release.";
                 SetReleaseLinkStyle(Color.Crimson, FontStyle.Bold);
-                showReleaseLink = true;
-            }
-            else if (showReleaseLink)
-            {
-                linkLabelNewVersion.Text = "Check GitHub Releases for updates";
-                SetReleaseLinkStyle(ForeColor, FontStyle.Bold);
-            }
-            else
-            {
-                tableLayoutPanel2.RowStyles[3] = new RowStyle(SizeType.Absolute, 0F);
+                return;
             }
 
-            if (showReleaseLink)
+            bool checkUpdates;
+            try
             {
-                linkLabelNewVersion.Click += linkLabelNewVersion_Click;
+                checkUpdates = Properties.Settings.Default.CheckUpdatesOnStartup;
+            }
+            catch
+            {
+                checkUpdates = true;
             }
 
-            buttonOK.Text = "OK";
-            buttonOK.Click += buttonOK_Click;
+            if (!checkUpdates)
+            {
+                HideUpdateRow();
+                return;
+            }
+
+            linkLabelNewVersion.Text = "Checking GitHub Releases…";
+            linkLabelNewVersion.Enabled = false;
+
+            try
+            {
+                using (CancellationTokenSource cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(12)))
+                {
+                    GitHubReleaseInfo latest = await GitHubReleaseClient.GetLatestStableAsync(cancellation.Token);
+                    if (latest != null && GitHubReleaseClient.IsNewer(latest))
+                    {
+                        releaseUrl = latest.Url;
+                        linkLabelNewVersion.Text = "Update available: " + latest.TagName;
+                        linkLabelNewVersion.Enabled = true;
+                        SetReleaseLinkStyle(Color.Crimson, FontStyle.Bold);
+                    }
+                    else
+                    {
+                        HideUpdateRow();
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                IO_Utilities.ErrorLogWriter("Startup update check failed: " + exception);
+                linkLabelNewVersion.Text = "Update check unavailable — open GitHub Releases";
+                linkLabelNewVersion.Enabled = true;
+                SetReleaseLinkStyle(ForeColor, FontStyle.Regular);
+            }
         }
 
         private void FormSplash_Shown(object sender, EventArgs e)
         {
         }
 
+        private void HideUpdateRow()
+        {
+            linkLabelNewVersion.Visible = false;
+            if (tableLayoutPanel2.RowStyles.Count > 3)
+            {
+                tableLayoutPanel2.RowStyles[3] = new RowStyle(SizeType.Absolute, 0F);
+            }
+        }
+
         private void linkLabelNewVersion_Click(object sender, EventArgs e)
         {
-            OpenUrl(Web_Utilities.LatestReleaseUrl);
+            OpenUrl(releaseUrl);
         }
 
         private void linkFirst_Click(object sender, EventArgs e)
@@ -102,7 +123,7 @@ namespace TS_SE_Tool
 
         private void linkLabelGitHub_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
-            OpenUrl(Web_Utilities.LatestReleaseUrl);
+            OpenUrl(Web_Utilities.ReleasesUrl);
         }
 
         private void linkLabelHelpLocalPDF_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
@@ -110,14 +131,8 @@ namespace TS_SE_Tool
             const string file = "HowTo.pdf";
             if (File.Exists(file))
             {
-                try
-                {
-                    System.Diagnostics.Process.Start(file);
-                }
-                catch (Exception exception)
-                {
-                    IO_Utilities.ErrorLogWriter("Could not open local help: " + exception);
-                }
+                try { System.Diagnostics.Process.Start(file); }
+                catch (Exception exception) { IO_Utilities.ErrorLogWriter("Could not open local help: " + exception); }
             }
             else
             {
@@ -147,26 +162,19 @@ namespace TS_SE_Tool
 
         private void SetReleaseLinkStyle(Color color, FontStyle style)
         {
-            if (linkLabelNewVersion.Links.Count > 0)
-            {
-                linkLabelNewVersion.Links[0].Enabled = true;
-            }
-
+            linkLabelNewVersion.Visible = true;
             linkLabelNewVersion.LinkBehavior = LinkBehavior.AlwaysUnderline;
             linkLabelNewVersion.LinkColor = color;
             linkLabelNewVersion.DisabledLinkColor = color;
-            linkLabelNewVersion.Font = new Font("Microsoft Sans Serif", 8.25F, style, GraphicsUnit.Point, 204);
+            linkLabelNewVersion.Font = new Font("Segoe UI", 9F, style, GraphicsUnit.Point);
         }
 
         private static void OpenUrl(string url)
         {
             if (!Web_Utilities.External.TryOpenUrl(url))
             {
-                MessageBox.Show(
-                    "Could not open the browser.\r\n" + url,
-                    "Open link",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                MessageBox.Show("Could not open the browser.\r\n" + url,
+                    "Open link", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
     }
