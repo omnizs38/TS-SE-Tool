@@ -98,6 +98,7 @@ jobs:
           Copy-Item 'LICENSE' $portable -Force
           Copy-Item 'NOTICE' $portable -Force
           Copy-Item 'README.md' $portable -Force
+          Copy-Item 'DEPENDENCIES.md' $portable -Force
 
           Get-ChildItem $portable -Directory -Filter updater -Recurse | Remove-Item -Recurse -Force
           Get-ChildItem $portable -File -Include *.pdb,*.log -Recurse | Remove-Item -Force
@@ -106,6 +107,9 @@ jobs:
           if (-not (Test-Path $exe)) { throw "Expected executable was not produced: $exe" }
           $fileVersion = (Get-Item $exe).VersionInfo.FileVersion
           if ($fileVersion -notlike '1.61.0*') { throw "Unexpected executable version: $fileVersion" }
+          foreach ($directory in @('img', 'lang', 'libs')) {
+            if (-not (Test-Path (Join-Path $portable $directory))) { throw "Portable package is missing $directory." }
+          }
 
           Compress-Archive -Path "$portable/*" -DestinationPath "artifacts/TS-SE-Tool-$env:PACKAGE_VERSION-portable.zip" -Force
 
@@ -123,6 +127,20 @@ jobs:
           & $iscc "/DMyAppVersion=$env:PACKAGE_VERSION" "/DSourceDir=$source" "/DOutputDir=$output" 'installer/TS-SE-Tool.iss'
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
 
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        run: |
+          $files = @(
+            Get-ChildItem 'artifacts/TS-SE-Tool-*-portable.zip'
+            Get-ChildItem 'artifacts/setup/*.exe'
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash *$($file.Name)"
+          }
+          $lines | Set-Content 'artifacts/SHA256SUMS.txt' -Encoding ascii
+          Get-Content 'artifacts/SHA256SUMS.txt'
+
       - name: Upload portable package
         uses: actions/upload-artifact@v4
         with:
@@ -136,6 +154,14 @@ jobs:
         with:
           name: TS-SE-Tool-${{ github.sha }}-setup
           path: artifacts/setup/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: TS-SE-Tool-${{ github.sha }}-checksums
+          path: artifacts/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
 
@@ -159,6 +185,12 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: TS-SE-Tool-${{ github.sha }}-setup
+          path: release
+
+      - name: Download checksums
+        uses: actions/download-artifact@v5
+        with:
+          name: TS-SE-Tool-${{ github.sha }}-checksums
           path: release
 
       - name: Publish release
