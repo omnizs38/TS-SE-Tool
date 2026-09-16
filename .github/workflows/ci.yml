@@ -17,7 +17,7 @@ concurrency:
 env:
   SOLUTION_FILE: TS SE Tool.sln
   BUILD_CONFIGURATION: Release
-  STABLE_VERSION: 1.61.2
+  STABLE_VERSION: 1.61.5
 
 jobs:
   build:
