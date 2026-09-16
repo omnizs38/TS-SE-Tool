@@ -1,9 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 
 namespace TS_SE_Tool.Save.Items
 {
@@ -18,8 +14,8 @@ namespace TS_SE_Tool.Save.Items
 
         internal string WriteUnidentifiedLines()
         {
-            //Must terminate with a newline, otherwise the closing brace the caller appends
-            //right after would end up glued to the last preserved line.
+            // Must terminate with a newline, otherwise the closing brace the caller appends
+            // right after would end up glued to the last preserved line.
             if (UnidentifiedLines.Count == 0)
                 return "";
 
@@ -31,9 +27,11 @@ namespace TS_SE_Tool.Save.Items
             return _message + Environment.NewLine + this.GetType().Name.ToLower() + " | " + _tagLine + " = " + _dataLine;
         }
 
-        internal string WriteErrorMsg( string _tagLine, string _dataLine)
+        internal string WriteErrorMsg(string _tagLine, string _dataLine)
         {
-            return this.GetType().Name.ToLower() + " | " + _tagLine + " = " + _dataLine;
+            // Unknown fields from newer saves are intentionally preserved by
+            // OriginalBlockMerge. Mark them as compatibility information instead of errors.
+            return "Save | Preserved field | " + this.GetType().Name.ToLower() + " | " + _tagLine + " = " + _dataLine;
         }
     }
 }
