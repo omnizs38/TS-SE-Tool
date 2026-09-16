@@ -30,17 +30,25 @@ jobs:
 
     steps:
       - name: Check out source
+        id: checkout
+        continue-on-error: true
         uses: actions/checkout@v5
         with:
           persist-credentials: false
 
       - name: Set up MSBuild
+        id: setup-msbuild
+        continue-on-error: true
         uses: microsoft/setup-msbuild@v2
 
       - name: Set up NuGet
+        id: setup-nuget
+        continue-on-error: true
         uses: NuGet/setup-nuget@v2
 
       - name: Cache NuGet packages
+        id: cache
+        continue-on-error: true
         uses: actions/cache@v4
         with:
           path: packages
@@ -49,6 +57,7 @@ jobs:
 
       - name: Restore current dependencies
         id: restore
+        if: steps.checkout.outcome == 'success' && steps.setup-nuget.outcome == 'success'
         continue-on-error: true
         shell: pwsh
         run: |
@@ -58,7 +67,7 @@ jobs:
 
       - name: Build release
         id: build
-        if: steps.restore.outcome == 'success'
+        if: steps.restore.outcome == 'success' && steps.setup-msbuild.outcome == 'success'
         continue-on-error: true
         shell: pwsh
         run: |
@@ -67,10 +76,24 @@ jobs:
 
       - name: Prepare failure diagnostics
         id: diagnostics
-        if: always() && github.event_name == 'pull_request' && (steps.restore.outcome == 'failure' || steps.build.outcome == 'failure')
+        if: always() && github.event_name == 'pull_request' && (steps.checkout.outcome == 'failure' || steps.setup-msbuild.outcome == 'failure' || steps.setup-nuget.outcome == 'failure' || steps.cache.outcome == 'failure' || steps.restore.outcome == 'failure' || steps.build.outcome == 'failure')
         shell: pwsh
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          MSBUILD_SETUP_OUTCOME: ${{ steps.setup-msbuild.outcome }}
+          NUGET_SETUP_OUTCOME: ${{ steps.setup-nuget.outcome }}
+          CACHE_OUTCOME: ${{ steps.cache.outcome }}
+          RESTORE_OUTCOME: ${{ steps.restore.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
         run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
           $all = New-Object System.Collections.Generic.List[string]
+          $all.Add("checkout=$env:CHECKOUT_OUTCOME")
+          $all.Add("setup-msbuild=$env:MSBUILD_SETUP_OUTCOME")
+          $all.Add("setup-nuget=$env:NUGET_SETUP_OUTCOME")
+          $all.Add("cache=$env:CACHE_OUTCOME")
+          $all.Add("restore=$env:RESTORE_OUTCOME")
+          $all.Add("build=$env:BUILD_OUTCOME")
           foreach ($path in @('artifacts/restore.log', 'artifacts/msbuild.log')) {
             if (-not (Test-Path $path)) { continue }
             $selected = Select-String -Path $path -Pattern ': error ', 'error CS', 'error MSB', 'Unable to find version', 'not found' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique
@@ -80,14 +103,8 @@ jobs:
           }
           $text = $all -join "`n"
           if ($text.Length -gt 55000) { $text = $text.Substring(0, 55000) }
-          @"
-          <!-- tsset-build-diagnostics -->
-          ### Windows build diagnostics
-
-          ````text
-          $text
-          ````
-          "@ | Set-Content artifacts/build-comment.md -Encoding utf8
+          $body = "<!-- tsset-build-diagnostics -->`n### Windows build diagnostics`n`n````text`n$text`n````"
+          Set-Content artifacts/build-comment.md -Value $body -Encoding utf8
 
       - name: Report failure diagnostics
         if: steps.diagnostics.outcome == 'success'
@@ -102,10 +119,10 @@ jobs:
               body: fs.readFileSync('artifacts/build-comment.md', 'utf8')
             });
 
-      - name: Stop after failed restore or build
-        if: always() && (steps.restore.outcome == 'failure' || steps.build.outcome == 'failure')
+      - name: Stop after failed bootstrap, restore, or build
+        if: always() && (steps.checkout.outcome == 'failure' || steps.setup-msbuild.outcome == 'failure' || steps.setup-nuget.outcome == 'failure' || steps.cache.outcome == 'failure' || steps.restore.outcome == 'failure' || steps.build.outcome == 'failure')
         shell: pwsh
-        run: throw 'Restore or MSBuild failed; see the diagnostics above.'
+        run: throw 'Bootstrap, restore, or MSBuild failed; see the diagnostics above.'
 
       - name: Determine package version
         shell: pwsh
