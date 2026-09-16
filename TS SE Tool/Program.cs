@@ -46,7 +46,7 @@ namespace TS_SE_Tool
             }
             finally
             {
-                TryWriteLog("--- END ---");
+                IO_Utilities.LogWriter("--- END ---");
             }
         }
 
@@ -108,7 +108,7 @@ namespace TS_SE_Tool
                 return;
 
             control.SetBounds(x, y, Math.Max(1, width), Math.Max(1, height));
-            control.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            control.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         }
 
         private static void UIThreadException(object sender, ThreadExceptionEventArgs eventArgs)
@@ -125,7 +125,7 @@ namespace TS_SE_Tool
 
         private static void ReportUnexpectedError(Exception exception, string caption)
         {
-            TryWriteLog(exception.ToString());
+            TryWriteError(exception.ToString());
             string message = "An unexpected error occurred. Details were written to errorlog.log.\r\n\r\n" +
                 "Please report the problem at:\r\n" + Web_Utilities.IssuesUrl;
 
@@ -138,7 +138,7 @@ namespace TS_SE_Tool
             }
         }
 
-        private static void TryWriteLog(string message)
+        private static void TryWriteError(string message)
         {
             try
             {
