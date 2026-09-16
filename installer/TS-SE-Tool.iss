@@ -32,7 +32,7 @@ VersionInfoVersion=1.61.1.0
 VersionInfoCompany=omnizs38 and contributors
 VersionInfoDescription=TS SE Tool Setup
 VersionInfoProductName=TS SE Tool
-VersionInfoProductVersion={#MyAppVersion}
+VersionInfoProductVersion=1.61.1.0
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
