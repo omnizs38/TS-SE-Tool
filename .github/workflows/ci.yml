@@ -1,11 +1,9 @@
-name: CI
+name: Windows build and release
 
 on:
   push:
-    branches:
-      - master
-    tags:
-      - "v*"
+    branches: [master]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -13,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: windows-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -22,13 +20,13 @@ env:
 
 jobs:
   build:
-    name: Build
-    runs-on: windows-latest
-    timeout-minutes: 20
+    name: Windows 2025 portable and setup
+    runs-on: windows-2025
+    timeout-minutes: 30
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
 
@@ -43,10 +41,9 @@ jobs:
         with:
           path: packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/packages.config') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
+          restore-keys: nuget-${{ runner.os }}-
 
-      - name: Restore dependencies
+      - name: Restore current dependencies
         shell: pwsh
         run: nuget restore "$env:SOLUTION_FILE" -NonInteractive
 
@@ -59,47 +56,114 @@ jobs:
           /p:Platform="Any CPU"
           /p:Deterministic=true
 
-      - name: Verify distributable
+      - name: Determine package version
         shell: pwsh
         run: |
-          $exe = "TS SE Tool/bin/Release/TS SE Tool.exe"
-          if (-not (Test-Path $exe)) {
-            throw "Expected executable was not produced: $exe"
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          } else {
+            $version = "1.61.0-ci.$env:GITHUB_RUN_NUMBER"
+          }
+          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Assemble maintained runtime
+        shell: pwsh
+        run: |
+          $portable = Join-Path $PWD 'artifacts/portable'
+          $legacyZip = Join-Path $env:RUNNER_TEMP 'runtime-assets.zip'
+          $legacyExtract = Join-Path $env:RUNNER_TEMP 'runtime-assets'
+          New-Item -ItemType Directory -Force -Path $portable | Out-Null
+
+          $url = 'https://github.com/omnizs38/TS-SE-Tool/releases/download/v97-stable/TS-SE-Tool-v97.zip'
+          Invoke-WebRequest -Uri $url -OutFile $legacyZip
+          $actualHash = (Get-FileHash $legacyZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expectedHash = '535b150d6a2c3e4a3ce6d5c250aacf38f2de7bcb5cbe61df7732b8640befe78d'
+          if ($actualHash -ne $expectedHash) { throw "Runtime asset checksum mismatch: $actualHash" }
+
+          Expand-Archive -Path $legacyZip -DestinationPath $legacyExtract -Force
+          $img = Get-ChildItem $legacyExtract -Directory -Filter img -Recurse | Select-Object -First 1
+          if (-not $img) { throw 'The pinned runtime archive does not contain the img directory.' }
+          $assetRoot = $img.Parent.FullName
+
+          foreach ($directory in @('img', 'lang', 'gameref')) {
+            $source = Join-Path $assetRoot $directory
+            if (Test-Path $source) { Copy-Item $source $portable -Recurse -Force }
+          }
+          foreach ($file in @('heavy_cargoes.csv', 'HowTo.pdf')) {
+            $source = Join-Path $assetRoot $file
+            if (Test-Path $source) { Copy-Item $source $portable -Force }
           }
 
-      - name: Upload build
+          Copy-Item 'TS SE Tool/bin/Release/*' $portable -Recurse -Force
+          Copy-Item 'LICENSE' $portable -Force
+          Copy-Item 'NOTICE' $portable -Force
+          Copy-Item 'README.md' $portable -Force
+
+          Get-ChildItem $portable -Directory -Filter updater -Recurse | Remove-Item -Recurse -Force
+          Get-ChildItem $portable -File -Include *.pdb,*.log -Recurse | Remove-Item -Force
+
+          $exe = Join-Path $portable 'TS SE Tool.exe'
+          if (-not (Test-Path $exe)) { throw "Expected executable was not produced: $exe" }
+          $fileVersion = (Get-Item $exe).VersionInfo.FileVersion
+          if ($fileVersion -notlike '1.61.0*') { throw "Unexpected executable version: $fileVersion" }
+
+          Compress-Archive -Path "$portable/*" -DestinationPath "artifacts/TS-SE-Tool-$env:PACKAGE_VERSION-portable.zip" -Force
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+          }
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler was not found.' }
+          $source = (Resolve-Path 'artifacts/portable').Path
+          $output = Join-Path $PWD 'artifacts/setup'
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+          & $iscc "/DMyAppVersion=$env:PACKAGE_VERSION" "/DSourceDir=$source" "/DOutputDir=$output" 'installer/TS-SE-Tool.iss'
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+
+      - name: Upload portable package
         uses: actions/upload-artifact@v4
         with:
-          name: TS-SE-Tool-${{ github.sha }}
-          path: TS SE Tool/bin/Release/**
+          name: TS-SE-Tool-${{ github.sha }}-portable
+          path: artifacts/TS-SE-Tool-*-portable.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload setup package
+        uses: actions/upload-artifact@v4
+        with:
+          name: TS-SE-Tool-${{ github.sha }}-setup
+          path: artifacts/setup/*.exe
           if-no-files-found: error
           retention-days: 14
 
   release:
-    name: Publish release
+    name: Publish GitHub release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 10
     permissions:
       contents: write
 
     steps:
-      - name: Download verified build
-        uses: actions/download-artifact@v4
+      - name: Download portable package
+        uses: actions/download-artifact@v5
         with:
-          name: TS-SE-Tool-${{ github.sha }}
-          path: release-package
+          name: TS-SE-Tool-${{ github.sha }}-portable
+          path: release
 
-      - name: Create release archive
-        shell: pwsh
-        run: |
-          $archive = "TS-SE-Tool-${{ github.ref_name }}.zip"
-          Compress-Archive -Path "release-package/*" -DestinationPath $archive -Force
+      - name: Download setup package
+        uses: actions/download-artifact@v5
+        with:
+          name: TS-SE-Tool-${{ github.sha }}-setup
+          path: release
 
-      - name: Publish GitHub release
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: TS-SE-Tool-${{ github.ref_name }}.zip
+          files: release/*
           generate_release_notes: true
           fail_on_unmatched_files: true
