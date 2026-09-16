@@ -86,7 +86,6 @@ namespace TS_SE_Tool
                 {
                     SiiNunitData.UnidentifiedBlocks.AddRange(preserved);
                     IO_Utilities.LogWriter("Profile load | preserved " + preserved.Count + " unmodelled save blocks unchanged");
-                    UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Info, "Profile loaded; " + preserved.Count + " newer blocks will be preserved unchanged.");
                 }
             }
         }
@@ -106,15 +105,16 @@ namespace TS_SE_Tool
         {
             ToolStripMenuItem startup = toolStripMenuItemProgramSettings;
             ToolStripMenuItem editor = toolStripMenuItemSettings;
-            if (startup.OwnerItem != toolStripMenuItemProgram || editor.OwnerItem != toolStripMenuItemProgram) return;
-            toolStripMenuItemProgram.DropDownItems.Remove(startup);
-            toolStripMenuItemProgram.DropDownItems.Remove(editor);
+            ToolStripMenuItem program = startup.OwnerItem as ToolStripMenuItem;
+            if (program == null || editor.OwnerItem != program) return;
+            program.DropDownItems.Remove(startup);
+            program.DropDownItems.Remove(editor);
             ToolStripMenuItem settings = new ToolStripMenuItem("Settings") { Name = "toolStripMenuItemUnifiedSettings", Image = editor.Image };
             editor.Text = "Editor settings";
             startup.Text = "Startup and updates";
             settings.DropDownItems.Add(editor);
             settings.DropDownItems.Add(startup);
-            toolStripMenuItemProgram.DropDownItems.Insert(0, settings);
+            program.DropDownItems.Insert(0, settings);
         }
 
         private void ConfigureCompanyDpiLayout()
