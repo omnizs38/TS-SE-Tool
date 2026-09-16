@@ -26,7 +26,6 @@ if (-not $img) {
 }
 $assetRoot = $img.Parent.FullName
 
-# Only data/resources are imported. Never copy old executables, DLLs, configs, logs or updater files.
 foreach ($directory in @('img', 'lang', 'gameref', 'dbs')) {
     $source = Join-Path $assetRoot $directory
     if (Test-Path $source) {
@@ -53,8 +52,9 @@ if (-not (Test-Path $exe)) {
     throw "Expected executable was not produced: $exe"
 }
 $fileVersion = (Get-Item $exe).VersionInfo.FileVersion
-if ($fileVersion -notlike '1.61.1*') {
-    throw "Unexpected executable version: $fileVersion"
+$expectedFileVersionPrefix = "$PackageVersion."
+if ($fileVersion -notlike "$expectedFileVersionPrefix*") {
+    throw "Unexpected executable version: $fileVersion (expected $PackageVersion.x)"
 }
 foreach ($directory in @('img', 'lang', 'libs')) {
     if (-not (Test-Path (Join-Path $portable $directory))) {
