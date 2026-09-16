@@ -23,4 +23,6 @@ Dependabot monitors NuGet and GitHub Actions updates.
 - `OpenPainter.ColorPicker.dll` supplies controls used by the in-tree attributed color-picker implementation. No newer compatible package is published.
 - SQL Server Compact native x86/amd64 binaries come from the pinned NuGet package during each build.
 
-The portable/setup pipeline assembles non-code runtime resources from the repository's pinned `v97-stable` asset, verifies SHA-256 `535b150d6a2c3e4a3ce6d5c250aacf38f2de7bcb5cbe61df7732b8640befe78d`, removes any legacy updater directory, and overlays the newly compiled binaries.
+## Runtime data provenance
+
+The `img`, `lang`, `gameref` and optional `dbs` data were distributed under the project's Apache-2.0 upstream release `LIPtoH/TS-SE-Tool v0.3.11.0`. Packaging downloads that immutable archive with a pinned SHA-256 and copies only those allowlisted data directories. Old executables, DLLs, configuration, logs and the legacy updater are never copied. Runtime update checks and all user-facing links point only to `omnizs38/TS-SE-Tool`.

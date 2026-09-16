@@ -30,25 +30,17 @@ jobs:
 
     steps:
       - name: Check out source
-        id: checkout
-        continue-on-error: true
         uses: actions/checkout@v5
         with:
           persist-credentials: false
 
       - name: Set up MSBuild
-        id: setup_msbuild
-        continue-on-error: true
         uses: microsoft/setup-msbuild@v2
 
       - name: Set up NuGet
-        id: setup_nuget
-        continue-on-error: true
         uses: NuGet/setup-nuget@v2
 
       - name: Cache NuGet packages
-        id: cache
-        continue-on-error: true
         uses: actions/cache@v4
         with:
           path: packages
@@ -56,73 +48,17 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
 
       - name: Restore current dependencies
-        id: restore
-        if: steps.checkout.outcome == 'success' && steps.setup_nuget.outcome == 'success'
-        continue-on-error: true
         shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
-          & nuget restore "$env:SOLUTION_FILE" -NonInteractive 2>&1 | Tee-Object -FilePath artifacts/restore.log
-          exit $LASTEXITCODE
+        run: nuget restore "$env:SOLUTION_FILE" -NonInteractive
 
       - name: Build release
-        id: build
-        if: steps.restore.outcome == 'success' && steps.setup_msbuild.outcome == 'success'
-        continue-on-error: true
         shell: pwsh
-        run: |
-          & msbuild "$env:SOLUTION_FILE" /m /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform="Any CPU" /p:Deterministic=true 2>&1 | Tee-Object -FilePath artifacts/msbuild.log
-          exit $LASTEXITCODE
-
-      - name: Prepare bootstrap/build diagnostics
-        id: build_diagnostics
-        if: always() && github.event_name == 'pull_request' && (steps.checkout.outcome == 'failure' || steps.setup_msbuild.outcome == 'failure' || steps.setup_nuget.outcome == 'failure' || steps.cache.outcome == 'failure' || steps.restore.outcome == 'failure' || steps.build.outcome == 'failure')
-        shell: pwsh
-        env:
-          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
-          MSBUILD_SETUP_OUTCOME: ${{ steps.setup_msbuild.outcome }}
-          NUGET_SETUP_OUTCOME: ${{ steps.setup_nuget.outcome }}
-          CACHE_OUTCOME: ${{ steps.cache.outcome }}
-          RESTORE_OUTCOME: ${{ steps.restore.outcome }}
-          BUILD_OUTCOME: ${{ steps.build.outcome }}
-        run: |
-          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
-          $all = New-Object System.Collections.Generic.List[string]
-          $all.Add("checkout=$env:CHECKOUT_OUTCOME")
-          $all.Add("setup-msbuild=$env:MSBUILD_SETUP_OUTCOME")
-          $all.Add("setup-nuget=$env:NUGET_SETUP_OUTCOME")
-          $all.Add("cache=$env:CACHE_OUTCOME")
-          $all.Add("restore=$env:RESTORE_OUTCOME")
-          $all.Add("build=$env:BUILD_OUTCOME")
-          foreach ($path in @('artifacts/restore.log', 'artifacts/msbuild.log')) {
-            if (-not (Test-Path $path)) { continue }
-            $selected = Select-String -Path $path -Pattern ': error ', 'error CS', 'error MSB', 'Unable to find version', 'not found' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique
-            if (-not $selected) { $selected = Get-Content $path -Tail 100 }
-            $all.Add("--- $path ---")
-            foreach ($line in ($selected | Select-Object -First 100)) { $all.Add($line) }
-          }
-          $text = $all -join "`n"
-          if ($text.Length -gt 55000) { $text = $text.Substring(0, 55000) }
-          $body = "<!-- tsset-build-diagnostics -->`n### Windows bootstrap/build diagnostics`n`n````text`n$text`n````"
-          Set-Content artifacts/build-comment.md -Value $body -Encoding utf8
-
-      - name: Report bootstrap/build diagnostics
-        if: steps.build_diagnostics.outcome == 'success'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: fs.readFileSync('artifacts/build-comment.md', 'utf8')
-            });
-
-      - name: Stop after failed bootstrap, restore, or build
-        if: always() && (steps.checkout.outcome == 'failure' || steps.setup_msbuild.outcome == 'failure' || steps.setup_nuget.outcome == 'failure' || steps.cache.outcome == 'failure' || steps.restore.outcome == 'failure' || steps.build.outcome == 'failure')
-        shell: pwsh
-        run: throw 'Bootstrap, restore, or MSBuild failed; see the diagnostics above.'
+        run: >-
+          msbuild "$env:SOLUTION_FILE"
+          /m
+          /p:Configuration=$env:BUILD_CONFIGURATION
+          /p:Platform="Any CPU"
+          /p:Deterministic=true
 
       - name: Determine package version
         shell: pwsh
@@ -130,64 +66,19 @@ jobs:
           if ($env:GITHUB_REF -like 'refs/tags/v*') {
             $version = $env:GITHUB_REF_NAME.TrimStart('v')
           } else {
-            $version = "1.61.0-ci.$env:GITHUB_RUN_NUMBER"
+            $version = "1.61.1-ci.$env:GITHUB_RUN_NUMBER"
           }
           "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Assemble maintained runtime
+      - name: Assemble portable package
         id: package
         continue-on-error: true
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $portable = Join-Path $PWD 'artifacts/portable'
-          $legacyZip = Join-Path $env:RUNNER_TEMP 'runtime-assets.zip'
-          $legacyExtract = Join-Path $env:RUNNER_TEMP 'runtime-assets'
           try {
-            New-Item -ItemType Directory -Force -Path $portable | Out-Null
-            $url = 'https://github.com/omnizs38/TS-SE-Tool/releases/download/v97-stable/TS-SE-Tool-v97.zip'
-            Invoke-WebRequest -Uri $url -OutFile $legacyZip
-            $actualHash = (Get-FileHash $legacyZip -Algorithm SHA256).Hash.ToLowerInvariant()
-            $expectedHash = '535b150d6a2c3e4a3ce6d5c250aacf38f2de7bcb5cbe61df7732b8640befe78d'
-            if ($actualHash -ne $expectedHash) { throw "Runtime asset checksum mismatch: $actualHash" }
-
-            Expand-Archive -Path $legacyZip -DestinationPath $legacyExtract -Force
-            $img = Get-ChildItem $legacyExtract -Directory -Filter img -Recurse | Select-Object -First 1
-            if (-not $img) { throw 'The pinned runtime archive does not contain the img directory.' }
-            $assetRoot = $img.Parent.FullName
-
-            foreach ($directory in @('img', 'lang', 'gameref')) {
-              $source = Join-Path $assetRoot $directory
-              if (Test-Path $source) { Copy-Item $source $portable -Recurse -Force }
-            }
-            foreach ($file in @('heavy_cargoes.csv', 'HowTo.pdf')) {
-              $source = Join-Path $assetRoot $file
-              if (Test-Path $source) { Copy-Item $source $portable -Force }
-            }
-
-            Copy-Item 'TS SE Tool/bin/Release/*' $portable -Recurse -Force
-            Copy-Item 'LICENSE' $portable -Force
-            Copy-Item 'NOTICE' $portable -Force
-            Copy-Item 'README.md' $portable -Force
-            Copy-Item 'DEPENDENCIES.md' $portable -Force
-
-            Get-ChildItem $portable -Directory -Filter updater -Recurse | Remove-Item -Recurse -Force
-            Get-ChildItem $portable -File -Include *.pdb,*.log -Recurse | Remove-Item -Force
-
-            $exe = Join-Path $portable 'TS SE Tool.exe'
-            if (-not (Test-Path $exe)) { throw "Expected executable was not produced: $exe" }
-            $fileVersion = (Get-Item $exe).VersionInfo.FileVersion
-            if ($fileVersion -notlike '1.61.0*') { throw "Unexpected executable version: $fileVersion" }
-            foreach ($directory in @('img', 'lang', 'libs')) {
-              if (-not (Test-Path (Join-Path $portable $directory))) { throw "Portable package is missing $directory." }
-            }
-
-            Compress-Archive -Path "$portable/*" -DestinationPath "artifacts/TS-SE-Tool-$env:PACKAGE_VERSION-portable.zip" -Force
+            ./build/Prepare-Portable.ps1 -PackageVersion $env:PACKAGE_VERSION
           } catch {
             ($_ | Format-List * -Force | Out-String) | Set-Content artifacts/package-error.txt -Encoding utf8
-            if (Test-Path $legacyExtract) {
-              Get-ChildItem $legacyExtract -Recurse | Select-Object -First 300 FullName, Length | Format-Table -AutoSize | Out-String -Width 300 | Add-Content artifacts/package-error.txt
-            }
             Write-Error $_
             exit 1
           }
@@ -198,7 +89,6 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
           try {
             $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
             if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
@@ -233,7 +123,7 @@ jobs:
           Get-Content 'artifacts/SHA256SUMS.txt'
 
       - name: Prepare packaging diagnostics
-        id: packaging_diagnostics
+        id: diagnostics
         if: always() && github.event_name == 'pull_request' && (steps.package.outcome == 'failure' || steps.installer.outcome == 'failure' || steps.checksums.outcome == 'failure')
         shell: pwsh
         env:
@@ -241,15 +131,9 @@ jobs:
           INSTALLER_OUTCOME: ${{ steps.installer.outcome }}
           CHECKSUM_OUTCOME: ${{ steps.checksums.outcome }}
         run: |
-          $all = New-Object System.Collections.Generic.List[string]
-          $all.Add("package=$env:PACKAGE_OUTCOME")
-          $all.Add("installer=$env:INSTALLER_OUTCOME")
-          $all.Add("checksums=$env:CHECKSUM_OUTCOME")
+          $all = @("package=$env:PACKAGE_OUTCOME", "installer=$env:INSTALLER_OUTCOME", "checksums=$env:CHECKSUM_OUTCOME")
           foreach ($path in @('artifacts/package-error.txt', 'artifacts/installer.log')) {
-            if (Test-Path $path) {
-              $all.Add("--- $path ---")
-              foreach ($line in (Get-Content $path | Select-Object -First 300)) { $all.Add($line) }
-            }
+            if (Test-Path $path) { $all += "--- $path ---"; $all += Get-Content $path | Select-Object -First 240 }
           }
           $text = $all -join "`n"
           if ($text.Length -gt 55000) { $text = $text.Substring(0, 55000) }
@@ -257,7 +141,7 @@ jobs:
           Set-Content artifacts/packaging-comment.md -Value $body -Encoding utf8
 
       - name: Report packaging diagnostics
-        if: steps.packaging_diagnostics.outcome == 'success'
+        if: steps.diagnostics.outcome == 'success'
         uses: actions/github-script@v7
         with:
           script: |
@@ -308,24 +192,18 @@ jobs:
       contents: write
 
     steps:
-      - name: Download portable package
-        uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v5
         with:
           name: TS-SE-Tool-${{ github.sha }}-portable
           path: release
-
-      - name: Download setup package
-        uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v5
         with:
           name: TS-SE-Tool-${{ github.sha }}-setup
           path: release
-
-      - name: Download checksums
-        uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v5
         with:
           name: TS-SE-Tool-${{ github.sha }}-checksums
           path: release
-
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:

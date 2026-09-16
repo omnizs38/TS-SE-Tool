@@ -45,29 +45,18 @@ namespace TS_SE_Tool.Updates
                 response.EnsureSuccessStatusCode();
                 string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 object[] releases = new JavaScriptSerializer().DeserializeObject(json) as object[];
-
-                if (releases == null)
-                {
-                    return null;
-                }
+                if (releases == null) return null;
 
                 GitHubReleaseInfo newest = null;
                 foreach (object item in releases)
                 {
                     Dictionary<string, object> release = item as Dictionary<string, object>;
-                    if (release == null || GetBoolean(release, "draft") || GetBoolean(release, "prerelease"))
-                    {
-                        continue;
-                    }
+                    if (release == null || GetBoolean(release, "draft") || GetBoolean(release, "prerelease")) continue;
 
                     string tag = GetString(release, "tag_name");
                     Version version;
-                    if (!TryParseSemanticTag(tag, out version))
-                    {
-                        continue;
-                    }
-
-                    if (newest == null || version > newest.Version)
+                    if (!TryParseSemanticTag(tag, out version)) continue;
+                    if (newest == null || version.CompareTo(newest.Version) > 0)
                     {
                         newest = new GitHubReleaseInfo
                         {
@@ -79,21 +68,20 @@ namespace TS_SE_Tool.Updates
                         };
                     }
                 }
-
                 return newest;
             }
         }
 
         internal static bool IsNewer(GitHubReleaseInfo release)
         {
-            return release != null && release.Version > CurrentVersion;
+            return release != null && release.Version.CompareTo(CurrentVersion) > 0;
         }
 
         private static HttpClient CreateClient()
         {
             HttpClient client = new HttpClient();
             client.Timeout = TimeSpan.FromSeconds(12);
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("TS-SE-Tool/1.61 (+https://github.com/omnizs38/TS-SE-Tool)");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("TS-SE-Tool/1.61.1 (+https://github.com/omnizs38/TS-SE-Tool)");
             client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
             return client;
         }
@@ -102,11 +90,7 @@ namespace TS_SE_Tool.Updates
         {
             version = null;
             Match match = SemanticTag.Match(tag ?? string.Empty);
-            if (!match.Success)
-            {
-                return false;
-            }
-
+            if (!match.Success) return false;
             int major = int.Parse(match.Groups["major"].Value);
             int minor = int.Parse(match.Groups["minor"].Value);
             int patch = match.Groups["patch"].Success ? int.Parse(match.Groups["patch"].Value) : 0;
