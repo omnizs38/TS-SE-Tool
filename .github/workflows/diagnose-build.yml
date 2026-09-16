@@ -1,0 +1,47 @@
+name: Diagnose Windows build
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  diagnose:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: microsoft/setup-msbuild@v2
+      - uses: NuGet/setup-nuget@v2
+      - name: Restore
+        shell: pwsh
+        run: nuget restore "TS SE Tool.sln" -NonInteractive
+      - name: Build and capture diagnostics
+        id: build
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          msbuild "TS SE Tool.sln" /m /p:Configuration=Release /p:Platform="Any CPU" /p:Deterministic=true 2>&1 | Tee-Object -FilePath build.log
+          exit $LASTEXITCODE
+      - name: Publish failure details
+        if: steps.build.outcome == 'failure'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const lines = fs.readFileSync('build.log', 'utf8').split(/\r?\n/);
+            const tail = lines.slice(-120).join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `### Windows build diagnostics\n\n\`\`\`text\n${tail}\n\`\`\``
+            });
+      - name: Fail job
+        if: steps.build.outcome == 'failure'
+        shell: pwsh
+        run: exit 1
