@@ -26,18 +26,13 @@ if (-not $img) {
 }
 $assetRoot = $img.Parent.FullName
 
-# Only data/resources are imported. Never copy old executables, DLLs, configs, logs or updater files.
 foreach ($directory in @('img', 'lang', 'gameref', 'dbs')) {
     $source = Join-Path $assetRoot $directory
-    if (Test-Path $source) {
-        Copy-Item $source $portable -Recurse -Force
-    }
+    if (Test-Path $source) { Copy-Item $source $portable -Recurse -Force }
 }
 foreach ($file in @('heavy_cargoes.csv', 'HowTo.pdf')) {
     $source = Join-Path $assetRoot $file
-    if (Test-Path $source) {
-        Copy-Item $source $portable -Force
-    }
+    if (Test-Path $source) { Copy-Item $source $portable -Force }
 }
 
 Copy-Item (Join-Path $PSScriptRoot '../TS SE Tool/bin/Release/*') $portable -Recurse -Force
@@ -49,17 +44,14 @@ Get-ChildItem $portable -Directory -Filter updater -Recurse | Remove-Item -Recur
 Get-ChildItem $portable -File -Include *.pdb,*.log,*.xml -Recurse | Remove-Item -Force
 
 $exe = Join-Path $portable 'TS SE Tool.exe'
-if (-not (Test-Path $exe)) {
-    throw "Expected executable was not produced: $exe"
-}
+if (-not (Test-Path $exe)) { throw "Expected executable was not produced: $exe" }
 $fileVersion = (Get-Item $exe).VersionInfo.FileVersion
-if ($fileVersion -notlike '1.61.1*') {
-    throw "Unexpected executable version: $fileVersion"
+$expectedAssemblyVersion = ($PackageVersion -split '-', 2)[0]
+if ($fileVersion -notlike "$expectedAssemblyVersion.*") {
+    throw "Unexpected executable version: $fileVersion (expected $expectedAssemblyVersion.x)"
 }
 foreach ($directory in @('img', 'lang', 'libs')) {
-    if (-not (Test-Path (Join-Path $portable $directory))) {
-        throw "Portable package is missing $directory."
-    }
+    if (-not (Test-Path (Join-Path $portable $directory))) { throw "Portable package is missing $directory." }
 }
 
 $archive = Join-Path $PSScriptRoot "../artifacts/TS-SE-Tool-$PackageVersion-portable.zip"

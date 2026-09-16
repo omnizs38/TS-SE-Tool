@@ -3,7 +3,6 @@
    Maintenance modifications copyright 2026 omnizs38 and contributors.
 
    Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
 */
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -18,6 +17,6 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyCulture("")]
 [assembly: ComVisible(false)]
 [assembly: Guid("95eba823-26bf-4a49-a674-e294b403bc99")]
-[assembly: AssemblyVersion("1.61.1.0")]
-[assembly: AssemblyFileVersion("1.61.1.0")]
-[assembly: AssemblyInformationalVersion("1.61.1")]
+[assembly: AssemblyVersion("1.61.2.0")]
+[assembly: AssemblyFileVersion("1.61.2.0")]
+[assembly: AssemblyInformationalVersion("1.61.2")]
