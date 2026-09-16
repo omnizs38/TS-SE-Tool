@@ -20,28 +20,31 @@ jobs:
       - name: Restore
         shell: pwsh
         run: nuget restore "TS SE Tool.sln" -NonInteractive
-      - name: Build and capture diagnostics
-        id: build
+      - name: Build
+        shell: pwsh
+        run: msbuild "TS SE Tool.sln" /m /p:Configuration=Release /p:Platform="Any CPU" /p:Deterministic=true
+      - name: Package and capture diagnostics
+        id: package
         continue-on-error: true
         shell: pwsh
         run: |
-          msbuild "TS SE Tool.sln" /m /p:Configuration=Release /p:Platform="Any CPU" /p:Deterministic=true 2>&1 | Tee-Object -FilePath build.log
+          ./build/Prepare-Portable.ps1 -PackageVersion 1.61.2 2>&1 | Tee-Object -FilePath package.log
           exit $LASTEXITCODE
       - name: Publish failure details
-        if: steps.build.outcome == 'failure'
+        if: steps.package.outcome == 'failure'
         uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
-            const lines = fs.readFileSync('build.log', 'utf8').split(/\r?\n/);
+            const lines = fs.readFileSync('package.log', 'utf8').split(/\r?\n/);
             const tail = lines.slice(-120).join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `### Windows build diagnostics\n\n\`\`\`text\n${tail}\n\`\`\``
+              body: `### Windows packaging diagnostics\n\n\`\`\`text\n${tail}\n\`\`\``
             });
       - name: Fail job
-        if: steps.build.outcome == 'failure'
+        if: steps.package.outcome == 'failure'
         shell: pwsh
         run: exit 1
