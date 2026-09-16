@@ -17,16 +17,13 @@ concurrency:
 env:
   SOLUTION_FILE: TS SE Tool.sln
   BUILD_CONFIGURATION: Release
+  STABLE_VERSION: 1.61.1
 
 jobs:
   build:
     name: Windows 2025 portable and setup
     runs-on: windows-2025
     timeout-minutes: 30
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
 
     steps:
       - name: Check out source
@@ -65,49 +62,30 @@ jobs:
         run: |
           if ($env:GITHUB_REF -like 'refs/tags/v*') {
             $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          } elseif ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -eq 'refs/heads/master') {
+            $version = $env:STABLE_VERSION
           } else {
-            $version = "1.61.1-ci.$env:GITHUB_RUN_NUMBER"
+            $version = "$env:STABLE_VERSION-ci.$env:GITHUB_RUN_NUMBER"
           }
           "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Assemble portable package
-        id: package
-        continue-on-error: true
         shell: pwsh
-        run: |
-          try {
-            ./build/Prepare-Portable.ps1 -PackageVersion $env:PACKAGE_VERSION
-          } catch {
-            ($_ | Format-List * -Force | Out-String) | Set-Content artifacts/package-error.txt -Encoding utf8
-            Write-Error $_
-            exit 1
-          }
+        run: ./build/Prepare-Portable.ps1 -PackageVersion $env:PACKAGE_VERSION
 
       - name: Build installer
-        id: installer
-        if: steps.package.outcome == 'success'
-        continue-on-error: true
         shell: pwsh
         run: |
-          try {
-            $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-            if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
-            if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler was not found.' }
-            $source = (Resolve-Path 'artifacts/portable').Path
-            $output = Join-Path $PWD 'artifacts/setup'
-            New-Item -ItemType Directory -Force -Path $output | Out-Null
-            & $iscc "/DMyAppVersion=$env:PACKAGE_VERSION" "/DSourceDir=$source" "/DOutputDir=$output" 'installer/TS-SE-Tool.iss' 2>&1 | Tee-Object -FilePath artifacts/installer.log
-            if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
-          } catch {
-            ($_ | Format-List * -Force | Out-String) | Add-Content artifacts/installer.log
-            Write-Error $_
-            exit 1
-          }
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler was not found.' }
+          $source = (Resolve-Path 'artifacts/portable').Path
+          $output = Join-Path $PWD 'artifacts/setup'
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+          & $iscc "/DMyAppVersion=$env:PACKAGE_VERSION" "/DSourceDir=$source" "/DOutputDir=$output" 'installer/TS-SE-Tool.iss'
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
 
       - name: Generate SHA-256 checksums
-        id: checksums
-        if: steps.installer.outcome == 'success'
-        continue-on-error: true
         shell: pwsh
         run: |
           $files = @(
@@ -121,42 +99,6 @@ jobs:
           if ($lines.Count -ne 2) { throw "Expected two release files, found $($lines.Count)." }
           $lines | Set-Content 'artifacts/SHA256SUMS.txt' -Encoding ascii
           Get-Content 'artifacts/SHA256SUMS.txt'
-
-      - name: Prepare packaging diagnostics
-        id: diagnostics
-        if: always() && github.event_name == 'pull_request' && (steps.package.outcome == 'failure' || steps.installer.outcome == 'failure' || steps.checksums.outcome == 'failure')
-        shell: pwsh
-        env:
-          PACKAGE_OUTCOME: ${{ steps.package.outcome }}
-          INSTALLER_OUTCOME: ${{ steps.installer.outcome }}
-          CHECKSUM_OUTCOME: ${{ steps.checksums.outcome }}
-        run: |
-          $all = @("package=$env:PACKAGE_OUTCOME", "installer=$env:INSTALLER_OUTCOME", "checksums=$env:CHECKSUM_OUTCOME")
-          foreach ($path in @('artifacts/package-error.txt', 'artifacts/installer.log')) {
-            if (Test-Path $path) { $all += "--- $path ---"; $all += Get-Content $path | Select-Object -First 240 }
-          }
-          $text = $all -join "`n"
-          if ($text.Length -gt 55000) { $text = $text.Substring(0, 55000) }
-          $body = "<!-- tsset-packaging-diagnostics -->`n### Windows packaging diagnostics`n`n````text`n$text`n````"
-          Set-Content artifacts/packaging-comment.md -Value $body -Encoding utf8
-
-      - name: Report packaging diagnostics
-        if: steps.diagnostics.outcome == 'success'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: fs.readFileSync('artifacts/packaging-comment.md', 'utf8')
-            });
-
-      - name: Stop after failed packaging
-        if: always() && (steps.package.outcome == 'failure' || steps.installer.outcome == 'failure' || steps.checksums.outcome == 'failure')
-        shell: pwsh
-        run: throw 'Packaging failed; see the diagnostics above.'
 
       - name: Upload portable package
         uses: actions/upload-artifact@v4
@@ -184,7 +126,7 @@ jobs:
 
   release:
     name: Publish GitHub release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/master') }}
     needs: build
     runs-on: windows-2025
     timeout-minutes: 10
@@ -192,21 +134,54 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/download-artifact@v5
+      - name: Select release tag
+        id: release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $tag = $env:GITHUB_REF_NAME
+          } else {
+            $tag = "v$env:STABLE_VERSION"
+          }
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            "publish=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host "Release $tag already exists; leaving it unchanged."
+          } else {
+            "publish=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
+
+      - name: Download portable package
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/download-artifact@v5
         with:
           name: TS-SE-Tool-${{ github.sha }}-portable
           path: release
-      - uses: actions/download-artifact@v5
+
+      - name: Download setup package
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/download-artifact@v5
         with:
           name: TS-SE-Tool-${{ github.sha }}-setup
           path: release
-      - uses: actions/download-artifact@v5
+
+      - name: Download checksums
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/download-artifact@v5
         with:
           name: TS-SE-Tool-${{ github.sha }}-checksums
           path: release
+
       - name: Publish release
+        if: steps.release.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: TS SE Tool ${{ steps.release.outputs.tag }}
           files: release/*
           generate_release_notes: true
           fail_on_unmatched_files: true

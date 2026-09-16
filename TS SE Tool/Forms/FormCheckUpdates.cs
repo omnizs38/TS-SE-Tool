@@ -24,7 +24,35 @@ namespace TS_SE_Tool
         {
             this.formMode = formMode ?? "check";
             InitializeComponent();
-            Size = new Size(440, 210);
+            ConfigureMaintainedLayout();
+        }
+
+        private void ConfigureMaintainedLayout()
+        {
+            AutoScaleMode = AutoScaleMode.Dpi;
+            Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            ControlBox = true;
+            MaximumSize = Size.Empty;
+            MinimumSize = new Size(480, 280);
+            ClientSize = new Size(520, 310);
+
+            tableLayoutPanel1.Padding = new Padding(12);
+            tableLayoutPanel1.RowStyles[0] = new RowStyle(SizeType.Absolute, 8F);
+            tableLayoutPanel1.RowStyles[1] = new RowStyle(SizeType.Percent, 100F);
+            tableLayoutPanel1.RowStyles[2] = new RowStyle(SizeType.Absolute, 8F);
+            tableLayoutPanel1.RowStyles[3] = new RowStyle(SizeType.Absolute, 42F);
+            tableLayoutPanel1.RowStyles[4] = new RowStyle(SizeType.Absolute, 0F);
+            tableLayoutPanel1.RowStyles[5] = new RowStyle(SizeType.Absolute, 8F);
+            tableLayoutPanel1.RowStyles[6] = new RowStyle(SizeType.Absolute, 42F);
+
+            labelStatus.AutoSize = false;
+            labelStatus.Dock = DockStyle.Fill;
+            labelStatus.Padding = new Padding(12);
+            labelStatus.TextAlign = ContentAlignment.MiddleCenter;
+            buttonDownload.Margin = new Padding(32, 4, 32, 4);
+            buttonOK.Margin = new Padding(32, 4, 32, 4);
+            progressBarDownload.Visible = false;
         }
 
         private async void FormCheckUpdates_Load(object sender, EventArgs e)
@@ -56,7 +84,9 @@ namespace TS_SE_Tool
                         NewVersion[0] = latest.TagName;
                         NewVersion[1] = latest.Url;
                         releaseUrl = latest.Url;
-                        labelStatus.Text = "Update available: " + latest.TagName + "\r\nInstalled: " + GitHubReleaseClient.CurrentVersion;
+                        labelStatus.Text = BuildUpdateSummary(
+                            "Update available: " + latest.TagName + "\r\nInstalled: " + GitHubReleaseClient.CurrentVersion,
+                            latest.Notes);
                         buttonDownload.Text = "Open " + latest.TagName;
                     }
                     else
@@ -75,6 +105,23 @@ namespace TS_SE_Tool
             {
                 buttonDownload.Enabled = true;
             }
+        }
+
+        private static string BuildUpdateSummary(string heading, string notes)
+        {
+            string normalized = (notes ?? string.Empty)
+                .Replace("\r\n", "\n")
+                .Replace("\r", "\n")
+                .Trim();
+            if (normalized.Length == 0)
+            {
+                return heading;
+            }
+            if (normalized.Length > 700)
+            {
+                normalized = normalized.Substring(0, 697).TrimEnd() + "…";
+            }
+            return heading + "\r\n\r\nRelease notes:\r\n" + normalized.Replace("\n", "\r\n");
         }
 
         private void buttonOk_Click(object sender, EventArgs e)
