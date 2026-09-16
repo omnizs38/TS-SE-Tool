@@ -25,6 +25,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      issues: write
       pull-requests: write
 
     steps:
@@ -47,28 +48,37 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
 
       - name: Restore current dependencies
-        shell: pwsh
-        run: nuget restore "$env:SOLUTION_FILE" -NonInteractive
-
-      - name: Build release
-        id: build
+        id: restore
         continue-on-error: true
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          & nuget restore "$env:SOLUTION_FILE" -NonInteractive 2>&1 | Tee-Object -FilePath artifacts/restore.log
+          exit $LASTEXITCODE
+
+      - name: Build release
+        id: build
+        if: steps.restore.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: |
           & msbuild "$env:SOLUTION_FILE" /m /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform="Any CPU" /p:Deterministic=true 2>&1 | Tee-Object -FilePath artifacts/msbuild.log
           exit $LASTEXITCODE
 
-      - name: Report build diagnostics
-        if: steps.build.outcome == 'failure' && github.event_name == 'pull_request'
+      - name: Prepare failure diagnostics
+        id: diagnostics
+        if: always() && github.event_name == 'pull_request' && (steps.restore.outcome == 'failure' || steps.build.outcome == 'failure')
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          $errors = Select-String -Path artifacts/msbuild.log -Pattern ': error ', 'error CS', 'error MSB' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique
-          if (-not $errors) { $errors = Get-Content artifacts/msbuild.log -Tail 80 }
-          $text = ($errors | Select-Object -First 80) -join "`n"
+          $all = New-Object System.Collections.Generic.List[string]
+          foreach ($path in @('artifacts/restore.log', 'artifacts/msbuild.log')) {
+            if (-not (Test-Path $path)) { continue }
+            $selected = Select-String -Path $path -Pattern ': error ', 'error CS', 'error MSB', 'Unable to find version', 'not found' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique
+            if (-not $selected) { $selected = Get-Content $path -Tail 100 }
+            $all.Add("--- $path ---")
+            foreach ($line in ($selected | Select-Object -First 100)) { $all.Add($line) }
+          }
+          $text = $all -join "`n"
           if ($text.Length -gt 55000) { $text = $text.Substring(0, 55000) }
           @"
           <!-- tsset-build-diagnostics -->
@@ -78,12 +88,24 @@ jobs:
           $text
           ````
           "@ | Set-Content artifacts/build-comment.md -Encoding utf8
-          gh pr comment $env:PR_NUMBER --body-file artifacts/build-comment.md
 
-      - name: Stop after failed build
-        if: steps.build.outcome == 'failure'
+      - name: Report failure diagnostics
+        if: steps.diagnostics.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: fs.readFileSync('artifacts/build-comment.md', 'utf8')
+            });
+
+      - name: Stop after failed restore or build
+        if: always() && (steps.restore.outcome == 'failure' || steps.build.outcome == 'failure')
         shell: pwsh
-        run: throw 'MSBuild failed; see the build diagnostics above.'
+        run: throw 'Restore or MSBuild failed; see the diagnostics above.'
 
       - name: Determine package version
         shell: pwsh
