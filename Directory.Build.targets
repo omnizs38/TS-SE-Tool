@@ -16,6 +16,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)TS SE Tool\CustomClasses\Updates\AutoUpdateService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TS SE Tool\Forms\FormMainModernUi.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TS SE Tool\Forms\FormMainMaintenance.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TS SE Tool\Forms\FormMainTruckAutoSelection.cs" />
   </ItemGroup>
   <PropertyGroup><ApplicationManifest>$(MSBuildThisFileDirectory)TS SE Tool\app.manifest</ApplicationManifest></PropertyGroup>
 </Project>
