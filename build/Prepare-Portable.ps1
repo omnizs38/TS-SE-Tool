@@ -8,8 +8,7 @@ $portable = Join-Path $PSScriptRoot '../artifacts/portable'
 $sourceZip = Join-Path $env:RUNNER_TEMP 'upstream-runtime-assets.zip'
 $sourceExtract = Join-Path $env:RUNNER_TEMP 'upstream-runtime-assets'
 $sourceUrl = 'https://github.com/LIPtoH/TS-SE-Tool/releases/download/v0.3.11.0/TS.SE.Tool.0.3.11.0.zip'
-# This intentional sentinel is replaced with the hash reported by the first controlled CI download.
-$expectedHash = '0000000000000000000000000000000000000000000000000000000000000000'
+$expectedHash = '0732cd4d861bd53b1570b90ecf928bc085e8b627c16db35edc9a0324d616b0da'
 
 Remove-Item $portable, $sourceExtract -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $portable | Out-Null
@@ -17,7 +16,7 @@ New-Item -ItemType Directory -Force -Path $portable | Out-Null
 Invoke-WebRequest -Uri $sourceUrl -OutFile $sourceZip
 $actualHash = (Get-FileHash $sourceZip -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualHash -ne $expectedHash) {
-    throw "Pinned upstream runtime checksum must be reviewed. Expected $expectedHash; actual $actualHash"
+    throw "Upstream runtime checksum mismatch. Expected $expectedHash; actual $actualHash"
 }
 
 Expand-Archive -Path $sourceZip -DestinationPath $sourceExtract -Force

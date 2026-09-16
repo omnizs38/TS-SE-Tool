@@ -25,4 +25,4 @@ Dependabot monitors NuGet and GitHub Actions updates.
 
 ## Runtime data provenance
 
-The `img`, `lang`, `gameref` and optional `dbs` data were distributed under the project's Apache-2.0 upstream release `LIPtoH/TS-SE-Tool v0.3.11.0`. Packaging downloads that immutable archive with a pinned SHA-256 and copies only those allowlisted data directories. Old executables, DLLs, configuration, logs and the legacy updater are never copied. Runtime update checks and all user-facing links point only to `omnizs38/TS-SE-Tool`.
+The `img`, `lang`, `gameref` and optional `dbs` data were distributed under the project's Apache-2.0 upstream release `LIPtoH/TS-SE-Tool v0.3.11.0`. Packaging verifies SHA-256 `0732cd4d861bd53b1570b90ecf928bc085e8b627c16db35edc9a0324d616b0da` and copies only those allowlisted data directories. Old executables, DLLs, configuration, logs and the legacy updater are never copied. Runtime update checks and all user-facing links point only to `omnizs38/TS-SE-Tool`.
