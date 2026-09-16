@@ -216,7 +216,7 @@ namespace TS_SE_Tool
                 return;
             }
 
-            company.CargoSeeds = CreateCargoSeeds(DefaultCargoSeedCount);
+            UpdateCargoSeeds(company, CreateCargoSeeds(DefaultCargoSeedCount));
             PrintCargoSeeds();
         }
 
@@ -229,7 +229,7 @@ namespace TS_SE_Tool
                 return;
             }
 
-            company.CargoSeeds = new uint[0];
+            UpdateCargoSeeds(company, new uint[0]);
             PrintCargoSeeds();
         }
 
@@ -242,9 +242,23 @@ namespace TS_SE_Tool
                 return;
             }
 
-            foreach (Company company in city.ReturnCompanies().Where(item => item != null && !item.Excluded))
+            List<Company> companies = city.ReturnCompanies().Where(item => item != null && !item.Excluded).ToList();
+            if (companies.Count == 0)
             {
-                company.CargoSeeds = CreateCargoSeeds(DefaultCargoSeedCount);
+                SetCargoMarketStatus("The selected city has no editable companies.", true);
+                return;
+            }
+
+            if (MessageBox.Show("Generate new cargo offer seeds for all " + companies.Count +
+                " companies in " + city.CityNameTranslated + "?", "Cargo market",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            {
+                return;
+            }
+
+            foreach (Company company in companies)
+            {
+                UpdateCargoSeeds(company, CreateCargoSeeds(DefaultCargoSeedCount));
             }
             PrintCargoSeeds();
             SetCargoMarketStatus("Cargo offers were generated for every company in the selected city.", false);
@@ -259,9 +273,23 @@ namespace TS_SE_Tool
                 return;
             }
 
-            foreach (Company company in city.ReturnCompanies().Where(item => item != null && !item.Excluded))
+            List<Company> companies = city.ReturnCompanies().Where(item => item != null && !item.Excluded).ToList();
+            if (companies.Count == 0)
             {
-                company.CargoSeeds = new uint[0];
+                SetCargoMarketStatus("The selected city has no editable companies.", true);
+                return;
+            }
+
+            if (MessageBox.Show("Clear every cargo offer seed for all " + companies.Count +
+                " companies in " + city.CityNameTranslated + "?", "Cargo market",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            {
+                return;
+            }
+
+            foreach (Company company in companies)
+            {
+                UpdateCargoSeeds(company, new uint[0]);
             }
             PrintCargoSeeds();
             SetCargoMarketStatus("Cargo offers were cleared for every company in the selected city.", false);
@@ -360,13 +388,54 @@ namespace TS_SE_Tool
                     seeds.Add(seed);
                 }
 
-                company.CargoSeeds = seeds.Distinct().OrderBy(value => value).Take(100).ToArray();
+                UpdateCargoSeeds(company, seeds.ToArray());
                 PrintCargoSeeds();
                 SetCargoMarketStatus("Cargo seeds were imported. Write the save to apply them.", false);
             }
             catch (Exception exception)
             {
                 SetCargoMarketStatus(exception.Message, true);
+            }
+        }
+
+        private void UpdateCargoSeeds(Company company, IEnumerable<uint> seeds)
+        {
+            if (company == null)
+            {
+                return;
+            }
+
+            uint[] normalized = (seeds ?? Enumerable.Empty<uint>())
+                .Distinct()
+                .OrderBy(value => value)
+                .Take(100)
+                .ToArray();
+            company.CargoSeeds = normalized;
+
+            City city = GetSelectedCargoCity();
+            if (city == null || SiiNunitData == null || SiiNunitData.Economy == null ||
+                SiiNunitData.Economy.companies == null || SiiNunitData.SiiNitems == null)
+            {
+                return;
+            }
+
+            string companyLink = SiiNunitData.Economy.companies.FirstOrDefault(link =>
+            {
+                string[] parts = (link ?? string.Empty).Split('.');
+                return parts.Length > 3 &&
+                    string.Equals(parts[2], company.CompanyName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(parts[3], city.CityName, StringComparison.OrdinalIgnoreCase);
+            });
+
+            if (string.IsNullOrEmpty(companyLink) || !SiiNunitData.SiiNitems.ContainsKey(companyLink))
+            {
+                return;
+            }
+
+            Save.Items.Company saveCompany = SiiNunitData.SiiNitems[companyLink] as Save.Items.Company;
+            if (saveCompany != null)
+            {
+                saveCompany.cargo_offer_seeds = normalized.ToList();
             }
         }
 
