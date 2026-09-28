@@ -36,7 +36,7 @@ foreach ($file in @('heavy_cargoes.csv', 'HowTo.pdf')) {
 }
 
 Copy-Item (Join-Path $PSScriptRoot '../TS SE Tool/bin/Release/*') $portable -Recurse -Force
-foreach ($file in @('LICENSE', 'NOTICE', 'README.md', 'DEPENDENCIES.md')) {
+foreach ($file in @('LICENSE', 'NOTICE', 'README.md', 'DEPENDENCIES.md', 'COMPATIBILITY.md')) {
     Copy-Item (Join-Path $PSScriptRoot "../$file") $portable -Force
 }
 

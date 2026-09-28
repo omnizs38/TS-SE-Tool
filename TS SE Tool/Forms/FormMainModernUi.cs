@@ -16,6 +16,7 @@ namespace TS_SE_Tool
         private bool maintainedUiInitialized;
         private FlowLayoutPanel convoyPackageActions;
         private FlowLayoutPanel cargoClipboardActions;
+        private Timer responsiveLayoutTimer;
 
         protected override void OnLoad(EventArgs e)
         {
@@ -29,8 +30,8 @@ namespace TS_SE_Tool
             maintainedUiInitialized = true;
 
             AutoScaleMode = AutoScaleMode.Dpi;
-            MinimumSize = new Size(920, 700);
-            Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            ApplyResponsiveMinimumSize();
+            Font = SystemFonts.MessageBoxFont;
             tabControlMain.Font = Font;
             tabControlMain.Padding = new Point(12, 5);
             TssetFoldersExist = new[] { "libs", "img", "lang" }.All(Directory.Exists);
@@ -46,23 +47,39 @@ namespace TS_SE_Tool
             AddCargoMarketButtons();
             ModernizeButtons(this);
 
-            tabPageConvoyTools.Resize += delegate { LayoutConvoyTools(); };
-            tabPageCargoMarket.Resize += delegate { LayoutCargoMarketDpi(); };
-            DpiChanged += delegate
+            responsiveLayoutTimer = new Timer { Interval = 75 };
+            responsiveLayoutTimer.Tick += delegate
             {
-                BeginInvoke((MethodInvoker)delegate
-                {
-                    LayoutConvoyTools();
-                    LayoutCargoMarketDpi();
-                });
+                responsiveLayoutTimer.Stop();
+                if (IsDisposed || Disposing) return;
+                LayoutResponsivePages();
             };
-            LayoutConvoyTools();
-            LayoutCargoMarketDpi();
+            tabPageConvoyTools.Resize += delegate { ScheduleResponsiveLayout(); };
+            tabPageCargoMarket.Resize += delegate { ScheduleResponsiveLayout(); };
+            DpiChanged += delegate { ScheduleResponsiveLayout(); };
+            FormClosed += delegate
+            {
+                if (responsiveLayoutTimer != null) responsiveLayoutTimer.Dispose();
+            };
+            LayoutResponsivePages();
         }
 
         private int DpiPx(int logicalPixels)
         {
             return Math.Max(1, (int)Math.Round(logicalPixels * Math.Max(1f, DeviceDpi / 96f)));
+        }
+
+        private void ScheduleResponsiveLayout()
+        {
+            if (responsiveLayoutTimer == null || IsDisposed || Disposing) return;
+            responsiveLayoutTimer.Stop();
+            responsiveLayoutTimer.Start();
+        }
+
+        private void LayoutResponsivePages()
+        {
+            LayoutConvoyTools();
+            LayoutCargoMarketDpi();
         }
 
         private void AddConvoyPackageButtons()
@@ -82,7 +99,7 @@ namespace TS_SE_Tool
             tabPageConvoyTools.Controls.Add(convoyPackageActions);
             convoyPackageActions.BringToFront();
 
-            label5.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            label5.Font = Font;
             label5.ForeColor = Color.DimGray;
             label5.AutoEllipsis = true;
             label5.TextAlign = ContentAlignment.TopLeft;
@@ -95,7 +112,7 @@ namespace TS_SE_Tool
             if (convoyPackageActions == null || tabPageConvoyTools.ClientSize.Width < 1) return;
             int margin = DpiPx(12);
             int gap = DpiPx(8);
-            int width = Math.Max(DpiPx(420), tabPageConvoyTools.ClientSize.Width - margin * 2);
+            int width = Math.Max(DpiPx(240), tabPageConvoyTools.ClientSize.Width - margin * 2);
             int standardRow = DpiPx(34);
             int largeRow = DpiPx(62);
 
@@ -111,12 +128,19 @@ namespace TS_SE_Tool
             tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Absolute, largeRow));
 
             int actionsTop = tableLayoutPanel1.Bottom + gap;
-            convoyPackageActions.SetBounds(margin, actionsTop, width, DpiPx(36));
-            int actionWidth = Math.Max(DpiPx(120), (width - gap * 2) / 3);
+            bool stackActions = width < DpiPx(520);
+            convoyPackageActions.WrapContents = stackActions;
+            convoyPackageActions.FlowDirection = FlowDirection.LeftToRight;
+            int actionRows = stackActions ? 2 : 1;
+            convoyPackageActions.SetBounds(margin, actionsTop, width, DpiPx(36) * actionRows);
+            int actionWidth = stackActions
+                ? Math.Max(DpiPx(110), (width - gap) / 2)
+                : Math.Max(DpiPx(120), (width - gap * 2) / 3);
             for (int index = 0; index < convoyPackageActions.Controls.Count; index++)
             {
                 convoyPackageActions.Controls[index].Size = new Size(actionWidth, DpiPx(32));
-                convoyPackageActions.Controls[index].Margin = new Padding(index == 0 ? 0 : gap, 0, 0, 0);
+                convoyPackageActions.Controls[index].Margin =
+                    new Padding(index == 0 || (stackActions && index == 2) ? 0 : gap, 0, 0, DpiPx(4));
             }
 
             label5.SetBounds(margin, convoyPackageActions.Bottom + gap, width, DpiPx(52));
@@ -125,7 +149,7 @@ namespace TS_SE_Tool
 
         private void AddCargoMarketButtons()
         {
-            label1.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            label1.Font = Font;
             label1.ForeColor = Color.DimGray;
             label1.TextAlign = ContentAlignment.MiddleLeft;
             label1.AutoEllipsis = true;
@@ -152,23 +176,28 @@ namespace TS_SE_Tool
             int margin = DpiPx(12);
             int gap = DpiPx(10);
             int labelWidth = DpiPx(58);
-            int width = Math.Max(DpiPx(440), tabPageCargoMarket.ClientSize.Width - margin * 2);
-            int columnWidth = (width - gap) / 2;
-            int fieldWidth = Math.Max(DpiPx(120), columnWidth - labelWidth);
+            int width = Math.Max(DpiPx(240), tabPageCargoMarket.ClientSize.Width - margin * 2);
             int rowHeight = DpiPx(28);
+            bool twoColumns = width >= DpiPx(680);
+            int columnWidth = twoColumns ? (width - gap) / 2 : width;
+            int fieldWidth = Math.Max(DpiPx(110), columnWidth - labelWidth);
 
             SetBounds(labelCargoMarketSource, margin, DpiPx(8), width, DpiPx(20));
             SetBounds(labelCargoMarketCity, margin, DpiPx(32), labelWidth, rowHeight);
             SetBounds(comboBoxCargoMarketSourceCity, margin + labelWidth, DpiPx(28), fieldWidth, rowHeight);
-            SetBounds(labelCargoMarketCompany, margin + columnWidth + gap, DpiPx(32), labelWidth, rowHeight);
-            SetBounds(comboBoxCargoMarketSourceCompany, margin + columnWidth + gap + labelWidth, DpiPx(28), fieldWidth, rowHeight);
+            int companyX = twoColumns ? margin + columnWidth + gap : margin;
+            int companyTop = twoColumns ? DpiPx(28) : DpiPx(62);
+            SetBounds(labelCargoMarketCompany, companyX, companyTop + DpiPx(4), labelWidth, rowHeight);
+            SetBounds(comboBoxCargoMarketSourceCompany, companyX + labelWidth, companyTop, fieldWidth, rowHeight);
 
-            SetBounds(buttonCargoMarketResetCargoCity, margin + labelWidth, DpiPx(62), fieldWidth, rowHeight);
-            SetBounds(buttonCargoMarketResetCargoCompany, margin + columnWidth + gap + labelWidth, DpiPx(62), fieldWidth, rowHeight);
-            SetBounds(buttonCargoMarketRandomizeCargoCity, margin + labelWidth, DpiPx(96), fieldWidth, rowHeight);
-            SetBounds(buttonCargoMarketRandomizeCargoCompany, margin + columnWidth + gap + labelWidth, DpiPx(96), fieldWidth, rowHeight);
+            int actionTop = twoColumns ? DpiPx(62) : DpiPx(96);
+            int companyActionTop = twoColumns ? actionTop : actionTop + DpiPx(68);
+            SetBounds(buttonCargoMarketResetCargoCity, margin + labelWidth, actionTop, fieldWidth, rowHeight);
+            SetBounds(buttonCargoMarketResetCargoCompany, companyX + labelWidth, companyActionTop, fieldWidth, rowHeight);
+            SetBounds(buttonCargoMarketRandomizeCargoCity, margin + labelWidth, actionTop + DpiPx(34), fieldWidth, rowHeight);
+            SetBounds(buttonCargoMarketRandomizeCargoCompany, companyX + labelWidth, companyActionTop + DpiPx(34), fieldWidth, rowHeight);
 
-            int clipboardTop = DpiPx(132);
+            int clipboardTop = (twoColumns ? actionTop : companyActionTop) + DpiPx(70);
             cargoClipboardActions.SetBounds(margin + labelWidth, clipboardTop, width - labelWidth, DpiPx(34));
             int clipboardWidth = Math.Max(DpiPx(150), (cargoClipboardActions.Width - gap) / 2);
             for (int index = 0; index < cargoClipboardActions.Controls.Count; index++)
@@ -177,7 +206,7 @@ namespace TS_SE_Tool
                 cargoClipboardActions.Controls[index].Margin = new Padding(index == 0 ? 0 : gap, 0, 0, 0);
             }
 
-            int seedTop = DpiPx(174);
+            int seedTop = clipboardTop + DpiPx(42);
             int seedHeight = DpiPx(138);
             SetBounds(listBoxCargoMarketSourceCargoSeeds, margin + labelWidth, seedTop, width - labelWidth, seedHeight);
 

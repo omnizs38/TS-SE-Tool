@@ -1,4 +1,4 @@
-﻿/*
+/*
    Copyright 2016-2022 LIPtoH <liptoh.codebase@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -174,14 +174,14 @@ namespace TS_SE_Tool
 
                 ProgSettingsV.ProgramVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
-                //Upper bound raised to 97 only after savefile v97 was verified to survive a
-                //load -> write -> reload cycle line for line (see OriginalBlockMerge).
-                //Attributes newer than this build are preserved rather than dropped, so the
-                //versions in between are structurally safe as well.
+                // Savefile v97 is used by the current ETS2/ATS 1.61 releases and was
+                // verified with a load -> write -> reload cycle (see OriginalBlockMerge).
+                // Unknown blocks and attributes are preserved so minor game updates do not
+                // silently discard data that this build does not model yet.
                 SupportedSavefileVersionETS2 = new int[] { 61, 97 }; //Supported save version
-                SupportedGameVersionETS2 = "1.43.x - 1.49.x"; //Last game version Tested on
+                SupportedGameVersionETS2 = "1.43.x - 1.61.x"; //Last game version tested on
                 //SupportedSavefileVersionATS;
-                SupportedGameVersionATS = "1.43.x - 1.5x (savefile 97)"; //Last game version Tested on
+                SupportedGameVersionATS = "1.43.x - 1.61.x"; //Last game version tested on
 
                 comboBoxRootFolders.FlatStyle =
                 comboBoxProfiles.FlatStyle =
@@ -597,7 +597,7 @@ namespace TS_SE_Tool
 
             //=== Company
 
-            pictureBoxCompanyLogo.Image = null;
+            SetCompanyLogoImage(null);
 
             textBoxUserCompanyCompanyName.Text = "";
             textBoxUserCompanyMoneyAccount.Text = "";
