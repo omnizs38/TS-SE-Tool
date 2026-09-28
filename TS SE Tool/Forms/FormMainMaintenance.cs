@@ -18,6 +18,8 @@ namespace TS_SE_Tool
     public partial class FormMain
     {
         private bool maintenanceFixesInitialized;
+        private object lastTruckDataSource;
+        private object lastTrailerDataSource;
 
         protected override void OnHandleCreated(EventArgs e)
         {
@@ -146,31 +148,49 @@ namespace TS_SE_Tool
             string[] candidates = { Path.Combine(root, logo + ".dds"), Path.Combine(root, "logo_" + logo + ".dds"), Path.Combine(root, logo.Replace("player_logo.", string.Empty) + ".dds") };
             string path = candidates.FirstOrDefault(File.Exists);
             if (path == null) return;
-            try { pictureBoxCompanyLogo.Image = Graphics_TSSET.ddsImgLoader(path, 94, 94).images[0]; }
+            try { SetCompanyLogoImage(Graphics_TSSET.ddsImgLoader(path, 94, 94).images[0]); }
             catch (Exception ex) { IO_Utilities.LogWriter("Company logo could not be loaded: " + ex.Message); }
+        }
+
+        private void SetCompanyLogoImage(Image image)
+        {
+            Image previous = pictureBoxCompanyLogo.Image;
+            pictureBoxCompanyLogo.Image = image;
+            if (previous != null && !ReferenceEquals(previous, image)) previous.Dispose();
         }
 
         private void ConfigureAutomaticVehicleSelection()
         {
-            comboBoxUserTruckCompanyTrucks.DataSourceChanged += AutomaticVehicleSelection;
-            comboBoxUserTrailerCompanyTrailers.DataSourceChanged += AutomaticVehicleSelection;
+            comboBoxUserTruckCompanyTrucks.DataSourceChanged += delegate
+            {
+                SelectOnlyVehicle(comboBoxUserTruckCompanyTrucks, "UserTruckNameless", ref lastTruckDataSource);
+            };
+            comboBoxUserTrailerCompanyTrailers.DataSourceChanged += delegate
+            {
+                SelectOnlyVehicle(comboBoxUserTrailerCompanyTrailers, "UserTrailerNameless", ref lastTrailerDataSource);
+            };
         }
 
-        private void AutomaticVehicleSelection(object sender, EventArgs e)
+        private void SelectOnlyVehicle(ComboBox combo, string valueColumn, ref object lastDataSource)
         {
-            ComboBox combo = sender as ComboBox;
-            if (combo == null || !combo.IsHandleCreated) return;
+            object dataSource = combo.DataSource;
+            if (dataSource == null || ReferenceEquals(dataSource, lastDataSource) || !combo.IsHandleCreated) return;
+            lastDataSource = dataSource;
             combo.BeginInvoke((MethodInvoker)delegate
             {
-                List<object> values = new List<object>();
-                foreach (object item in combo.Items)
-                {
-                    DataRowView row = item as DataRowView;
-                    if (row == null || row.Row.ItemArray.Length == 0) continue;
-                    object value = row.Row[0];
-                    if (value != null && value != DBNull.Value && value.ToString() != "null") values.Add(value);
-                }
-                if (values.Count == 1) { combo.Enabled = true; combo.SelectedValue = values[0]; }
+                if (combo.IsDisposed || combo.Disposing) return;
+                List<object> values = combo.Items.Cast<object>()
+                    .OfType<DataRowView>()
+                    .Where(row => row.Row.Table.Columns.Contains(valueColumn))
+                    .Select(row => row.Row[valueColumn])
+                    .Where(value => value != null && value != DBNull.Value &&
+                        !string.IsNullOrWhiteSpace(value.ToString()) &&
+                        !string.Equals(value.ToString(), "null", StringComparison.OrdinalIgnoreCase))
+                    .Distinct()
+                    .ToList();
+                if (values.Count != 1) return;
+                combo.Enabled = true;
+                combo.SelectedValue = values[0];
             });
         }
 

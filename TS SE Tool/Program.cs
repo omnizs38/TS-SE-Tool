@@ -40,7 +40,6 @@ namespace TS_SE_Tool
                 Application.SetCompatibleTextRenderingDefault(false);
 
                 FormMain mainForm = new FormMain();
-                ConfigureResponsiveUi(mainForm);
                 ConfigureJobManagement(mainForm);
                 Application.Run(mainForm);
             }
@@ -48,20 +47,6 @@ namespace TS_SE_Tool
             {
                 IO_Utilities.LogWriter("--- END ---");
             }
-        }
-
-        private static void ConfigureResponsiveUi(FormMain form)
-        {
-            form.MaximumSize = Size.Empty;
-            form.MinimumSize = new Size(850, 660);
-            form.Size = new Size(Math.Max(form.Width, 1000), Math.Max(form.Height, 700));
-
-            TabPage cargoPage = Find<TabPage>(form, "tabPageCargoMarket");
-            if (cargoPage == null) return;
-            Label workInProgress = Find<Label>(cargoPage, "label1");
-            if (workInProgress != null) workInProgress.Visible = false;
-            cargoPage.Resize += delegate { LayoutCargoMarket(cargoPage); };
-            LayoutCargoMarket(cargoPage);
         }
 
         private static void ConfigureJobManagement(FormMain form)
@@ -180,39 +165,11 @@ namespace TS_SE_Tool
                 form.SiiNunitData.NamelessIgnoreList.Add(id);
         }
 
-        private static void LayoutCargoMarket(TabPage page)
-        {
-            int margin = 16, gap = 12, labelWidth = 70;
-            int width = Math.Max(420, page.ClientSize.Width - margin * 2);
-            int columnWidth = (width - gap) / 2;
-            int fieldWidth = Math.Max(100, columnWidth - labelWidth);
-            Place(Find<Label>(page, "labelCargoMarketSource"), margin, 14, width, 20);
-            Place(Find<Label>(page, "labelCargoMarketCity"), margin, 44, labelWidth, 24);
-            Place(Find<ComboBox>(page, "comboBoxCargoMarketSourceCity"), margin + labelWidth, 40, fieldWidth, 28);
-            Place(Find<Label>(page, "labelCargoMarketCompany"), margin + columnWidth + gap, 44, labelWidth, 24);
-            Place(Find<ComboBox>(page, "comboBoxCargoMarketSourceCompany"), margin + columnWidth + gap + labelWidth, 40, fieldWidth, 28);
-            Place(Find<Button>(page, "buttonCargoMarketResetCargoCity"), margin + labelWidth, 76, fieldWidth, 30);
-            Place(Find<Button>(page, "buttonCargoMarketResetCargoCompany"), margin + columnWidth + gap + labelWidth, 76, fieldWidth, 30);
-            Place(Find<Button>(page, "buttonCargoMarketRandomizeCargoCity"), margin + labelWidth, 112, fieldWidth, 30);
-            Place(Find<Button>(page, "buttonCargoMarketRandomizeCargoCompany"), margin + columnWidth + gap + labelWidth, 112, fieldWidth, 30);
-            Place(Find<ListBox>(page, "listBoxCargoMarketSourceCargoSeeds"), margin + labelWidth, 154, width - labelWidth, 150);
-            Place(Find<Label>(page, "labelCMTrailerType"), margin, 322, labelWidth, 24);
-            Place(Find<ComboBox>(page, "comboBoxCMTrailerTypes"), margin + labelWidth, 318, width - labelWidth, 28);
-            Place(Find<ListBox>(page, "listBoxCargoMarketCargoListForCompany"), margin + labelWidth, 358, width - labelWidth, Math.Max(100, page.ClientSize.Height - 374));
-        }
-
         private static T Find<T>(Control root, string name) where T : Control
         {
             if (root == null) return null;
             Control[] controls = root.Controls.Find(name, true);
             return controls.Length == 0 ? null : controls[0] as T;
-        }
-
-        private static void Place(Control control, int x, int y, int width, int height)
-        {
-            if (control == null) return;
-            control.SetBounds(x, y, Math.Max(1, width), Math.Max(1, height));
-            control.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         }
 
         private static void UIThreadException(object sender, ThreadExceptionEventArgs e) { ReportUnexpectedError(e.Exception, "Windows Forms error"); }

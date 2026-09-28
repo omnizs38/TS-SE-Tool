@@ -9,7 +9,9 @@ A maintained Windows save editor for **Euro Truck Simulator 2** and **American T
 
 This repository is the maintained source of TS SE Tool. Runtime links, update checks, CI and release artifacts point only to `omnizs38/TS-SE-Tool`. Required Apache-2.0 and third-party attribution is retained.
 
-The save pipeline supports save-file versions **61–97**, preserves unmodelled fields and writes through an atomic temporary file. ETS2/ATS 1.60–1.61 saves use version 97. Newer formats remain unverified until tested with real profiles.
+The save pipeline supports save-file versions **61–97**, preserves unmodelled fields and writes through an atomic temporary file. The current ETS2 and ATS 1.61 releases use save-file version 97. Newer formats remain unverified until tested with real profiles; the editor shows a warning instead of silently claiming compatibility.
+
+See [COMPATIBILITY.md](COMPATIBILITY.md) for the verified game/save matrix and validation policy.
 
 ## Features
 
