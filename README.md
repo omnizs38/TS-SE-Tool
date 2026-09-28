@@ -19,7 +19,7 @@ The save pipeline supports save-file versions **61–97**, preserves unmodelled 
 - Generate, clear, inspect, copy and paste cargo-market offer seeds by company or city
 - Copy/paste truck positions and complete GPS routes
 - Export/import versioned `.tsconvoy` packages and create position variants across saves
-- Safe GitHub Releases update checks (no background download, execution or self-overwrite)
+- Secure background update downloads with SHA-256 verification and installation after application exit
 - Headless save round-trip diagnostic with `--selftest`
 
 ## Downloads
