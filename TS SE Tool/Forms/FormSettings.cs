@@ -250,7 +250,7 @@ namespace TS_SE_Tool
 
             //Pickup time intervals
             // 384 hours is represented as 15 days + 24 hours, not an invalid 16-day value.
-            decimal pickupDays = Math.Floor(Math.Max(0, MainForm.ProgSettingsV.JobPickupTime) / 24m);
+            decimal pickupDays = Math.Floor(Math.Max(0, (int)MainForm.ProgSettingsV.JobPickupTime) / 24m);
             numericUpDownSettingPickTimeD.Value = Math.Min(numericUpDownSettingPickTimeD.Maximum, pickupDays);
             numericUpDownSettingPickTimeH.Value = MainForm.ProgSettingsV.JobPickupTime - numericUpDownSettingPickTimeD.Value * 24;
 
