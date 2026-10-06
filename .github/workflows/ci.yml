@@ -32,13 +32,18 @@ jobs:
           persist-credentials: false
 
       - name: Set up MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Set up NuGet
-        uses: NuGet/setup-nuget@v2
+        uses: NuGet/setup-nuget@v4
+
+      - name: Set up .NET 10 LTS
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/packages.config') }}
@@ -57,13 +62,15 @@ jobs:
           /p:Platform="Any CPU"
           /p:Deterministic=true
 
-      - name: Build and run stability regression tests
+      - name: Build and run stability regression tests on legacy and modern .NET
         shell: pwsh
         run: |
           msbuild 'tests/TS-SE-Tool.RegressionTests/TS-SE-Tool.RegressionTests.csproj' /m /p:Configuration=Release
           if ($LASTEXITCODE -ne 0) { throw "Regression test build failed with exit code $LASTEXITCODE" }
           & './tests/TS-SE-Tool.RegressionTests/bin/Release/TS-SE-Tool.RegressionTests.exe'
           if ($LASTEXITCODE -ne 0) { throw "Regression tests failed with exit code $LASTEXITCODE" }
+          dotnet run --project 'tests/TS-SE-Tool.ModernRegressionTests/TS-SE-Tool.ModernRegressionTests.csproj' --configuration Release
+          if ($LASTEXITCODE -ne 0) { throw ".NET 10 regression tests failed with exit code $LASTEXITCODE" }
 
       - name: Determine package version
         shell: pwsh

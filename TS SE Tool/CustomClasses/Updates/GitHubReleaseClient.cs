@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
@@ -30,7 +29,6 @@ namespace TS_SE_Tool.Updates
     internal static class GitHubReleaseClient
     {
         private const string ReleasesApi = "https://api.github.com/repos/omnizs38/TS-SE-Tool/releases?per_page=20";
-        private static readonly Regex SemanticTag = new Regex(@"^v(?<major>\d+)\.(?<minor>\d+)(?:\.(?<patch>\d+))?(?:\.(?<revision>\d+))?\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
         private static readonly HttpClient Client = CreateClient();
 
         internal static Version CurrentVersion { get { return Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0); } }
@@ -100,13 +98,7 @@ namespace TS_SE_Tool.Updates
 
         internal static bool TryParseSemanticTag(string tag, out Version version)
         {
-            version = null;
-            Match match = SemanticTag.Match(tag ?? string.Empty);
-            if (!match.Success) return false;
-            // A malformed release must not abort all update checks.
-            return Version.TryParse(match.Groups["major"].Value + "." + match.Groups["minor"].Value + "."
-                + (match.Groups["patch"].Success ? match.Groups["patch"].Value : "0") + "."
-                + (match.Groups["revision"].Success ? match.Groups["revision"].Value : "0"), out version);
+            return ReleaseValidation.TryParseSemanticTag(tag, out version);
         }
 
         private static string GetString(Dictionary<string, object> source, string key) { object value; return source.TryGetValue(key, out value) && value != null ? Convert.ToString(value) : string.Empty; }

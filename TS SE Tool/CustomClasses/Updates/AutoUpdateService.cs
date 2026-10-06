@@ -70,19 +70,7 @@ namespace TS_SE_Tool.Updates
 
         internal static string FindExpectedHash(string checksums, string fileName)
         {
-            if (string.IsNullOrEmpty(fileName)) return null;
-            string expected = null;
-            foreach (string line in (checksums ?? string.Empty).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                Match match = Regex.Match(line.Trim(), @"^(?<hash>[a-fA-F0-9]{64})[ \t]+\*?(?<name>.+)$", RegexOptions.CultureInvariant);
-                if (!match.Success || !string.Equals(match.Groups["name"].Value, fileName, StringComparison.Ordinal)) continue;
-                string hash = match.Groups["hash"].Value;
-                // Ambiguous checksums are not a safe basis for installing executable code.
-                if (expected != null && !string.Equals(expected, hash, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("The update has conflicting SHA-256 checksums.");
-                expected = hash;
-            }
-            return expected;
+            return ReleaseValidation.FindExpectedHash(checksums, fileName);
         }
 
         private static string ComputeSha256(byte[] data)

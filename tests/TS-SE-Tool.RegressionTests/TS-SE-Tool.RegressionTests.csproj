@@ -13,6 +13,7 @@
         <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
         <OutputPath>bin\$(Configuration)\</OutputPath>
         <LangVersion>latest</LangVersion>
+        <DefineConstants>$(DefineConstants);LEGACY_UPDATER</DefineConstants>
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
         <Deterministic>true</Deterministic>
     </PropertyGroup>
@@ -26,6 +27,7 @@
         <Compile Include="TestSupport.cs" />
         <Compile Include="..\..\TS SE Tool\CustomClasses\Utilities\AtomicFile.cs"><Link>AtomicFile.cs</Link></Compile>
         <Compile Include="..\..\TS SE Tool\CustomClasses\Program\ProgSettings.cs"><Link>ProgSettings.cs</Link></Compile>
+        <Compile Include="..\..\TS SE Tool\CustomClasses\Updates\ReleaseValidation.cs"><Link>ReleaseValidation.cs</Link></Compile>
         <Compile Include="..\..\TS SE Tool\CustomClasses\Updates\GitHubReleaseClient.cs"><Link>GitHubReleaseClient.cs</Link></Compile>
         <Compile Include="..\..\TS SE Tool\CustomClasses\Updates\AutoUpdateService.cs"><Link>AutoUpdateService.cs</Link></Compile>
     </ItemGroup>

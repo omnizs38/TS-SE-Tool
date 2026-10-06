@@ -126,25 +126,27 @@ internal static class RegressionTests
             Run("valid semantic tag " + tag, () =>
             {
                 Version version;
-                Equal(true, GitHubReleaseClient.TryParseSemanticTag(tag, out version));
+                Equal(true, ReleaseValidation.TryParseSemanticTag(tag, out version));
                 Equal(new Version(1, 62, tag == "v1.62" ? 0 : 1, 0), version);
             });
         foreach (string tag in new[] { "v999999999999999999999.62.1", "v1.999999999999999999.0", "v1.62.1-beta", "v-1.62.1", "../v1.62.1", "v1.62.1\n", "", null })
             Run("reject malformed semantic tag " + (tag ?? "null"), () =>
             {
                 Version version;
-                Equal(false, GitHubReleaseClient.TryParseSemanticTag(tag, out version));
+                Equal(false, ReleaseValidation.TryParseSemanticTag(tag, out version));
                 Equal<Version>(null, version);
             });
         string name = "TS-SE-Tool-1.62.1-setup.exe";
         string hash = new string('a', 64);
-        Run("binary checksum exact match", () => Equal(hash, AutoUpdateService.FindExpectedHash(hash + " *" + name + "\r\n", name)));
-        Run("text checksum exact match", () => Equal(hash, AutoUpdateService.FindExpectedHash(hash + "  " + name, name)));
-        Run("checksum suffix collision rejected", () => Equal<string>(null, AutoUpdateService.FindExpectedHash(hash + " *evil-" + name, name)));
-        Run("non-hex checksum rejected", () => Equal<string>(null, AutoUpdateService.FindExpectedHash(new string('z', 64) + " *" + name, name)));
-        Run("conflicting checksums rejected", () => Throws<InvalidDataException>(() => AutoUpdateService.FindExpectedHash(hash + " *" + name + "\n" + new string('b', 64) + " *" + name, name)));
-        Run("equivalent checksums accepted", () => Equal(hash.ToUpperInvariant(), AutoUpdateService.FindExpectedHash(hash + " *" + name + "\n" + hash.ToUpperInvariant() + " *" + name, name)));
+        Run("binary checksum exact match", () => Equal(hash, ReleaseValidation.FindExpectedHash(hash + " *" + name + "\r\n", name)));
+        Run("text checksum exact match", () => Equal(hash, ReleaseValidation.FindExpectedHash(hash + "  " + name, name)));
+        Run("checksum suffix collision rejected", () => Equal<string>(null, ReleaseValidation.FindExpectedHash(hash + " *evil-" + name, name)));
+        Run("non-hex checksum rejected", () => Equal<string>(null, ReleaseValidation.FindExpectedHash(new string('z', 64) + " *" + name, name)));
+        Run("conflicting checksums rejected", () => Throws<InvalidDataException>(() => ReleaseValidation.FindExpectedHash(hash + " *" + name + "\n" + new string('b', 64) + " *" + name, name)));
+        Run("equivalent checksums accepted", () => Equal(hash.ToUpperInvariant(), ReleaseValidation.FindExpectedHash(hash + " *" + name + "\n" + hash.ToUpperInvariant() + " *" + name, name)));
+#if LEGACY_UPDATER
         Run("cancelled update stops before download", () => Throws<OperationCanceledException>(() => AutoUpdateService.DownloadAndScheduleAsync(null, new CancellationToken(true)).GetAwaiter().GetResult()));
+#endif
         Console.WriteLine("Passed: " + passed + "; failed: " + failed);
         return failed == 0 ? 0 : 1;
     }
