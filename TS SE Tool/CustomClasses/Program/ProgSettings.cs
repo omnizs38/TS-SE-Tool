@@ -8,7 +8,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading;
 using TS_SE_Tool.Utilities;
 
@@ -32,10 +31,14 @@ namespace TS_SE_Tool
 
         public void LoadConfigFromFile()
         {
+            LoadConfigFromFile(Path.Combine(Directory.GetCurrentDirectory(), "config.cfg"));
+        }
+
+        internal void LoadConfigFromFile(string config)
+        {
             try
             {
                 string gameType = "";
-                string config = Path.Combine(Directory.GetCurrentDirectory(), "config.cfg");
                 foreach (string rawLine in File.ReadAllLines(config))
                 {
                     if (string.IsNullOrWhiteSpace(rawLine) || rawLine.TrimStart().StartsWith("#")) continue;
@@ -47,11 +50,19 @@ namespace TS_SE_Tool
                     {
                         case "ProgramVersion": ProgPrevVersion = data; break;
                         case "Language": Language = data; break;
-                        case "JobPickupTime": short.TryParse(data, out short pickup); JobPickupTime = pickup; break;
-                        case "LoopEvery": byte.TryParse(data, out byte loop); LoopEvery = loop; break;
-                        case "ProposeRandom": bool.TryParse(data, out bool random); ProposeRandom = random; break;
+                        case "JobPickupTime":
+                            if (short.TryParse(data, out short pickup) && pickup >= 0 && pickup <= 384)
+                                JobPickupTime = pickup;
+                            break;
+                        case "LoopEvery":
+                            if (byte.TryParse(data, out byte loop) && loop <= 100) LoopEvery = loop;
+                            break;
+                        case "ProposeRandom":
+                            if (bool.TryParse(data, out bool random)) ProposeRandom = random;
+                            break;
                         case "TimeMultiplier":
-                            if (double.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out double multiplier))
+                            if (double.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out double multiplier)
+                                && !double.IsNaN(multiplier) && !double.IsInfinity(multiplier))
                                 TimeMultiplier = Math.Max(0.1, Math.Min(7.0, multiplier));
                             break;
                         case "DistanceMes": DistanceMes = data; break;
@@ -67,18 +78,43 @@ namespace TS_SE_Tool
                             }
                             break;
                         case "LastUpdateCheck":
-                            if (long.TryParse(data, out long fileTime)) LastUpdateCheck = DateTime.FromFileTimeUtc(fileTime).ToLocalTime();
+                            if (TryParseFileTime(data, out DateTime checkedAt)) LastUpdateCheck = checkedAt;
                             break;
                     }
                 }
                 CustomPaths = CustomPaths.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value.Distinct().ToList());
             }
-            catch
+            catch (FileNotFoundException)
             {
-                IO_Utilities.LogWriter("Config.cfg file not found or has an invalid format. Restoring defaults.");
-                WriteConfigToFile();
+                IO_Utilities.LogWriter("Config.cfg file not found. Writing default settings.");
+                WriteConfigToFile(config);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                IO_Utilities.LogWriter("Config.cfg directory was not found; keeping in-memory settings.");
+            }
+            catch (IOException exception)
+            {
+                // A transient read error must never replace the user's existing configuration.
+                IO_Utilities.LogWriter("Could not read config.cfg: " + exception.Message);
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                IO_Utilities.LogWriter("Could not read config.cfg: " + exception.Message);
             }
             ApplyLanguagePreference();
+        }
+
+        private static bool TryParseFileTime(string data, out DateTime value)
+        {
+            value = default(DateTime);
+            if (!long.TryParse(data, out long fileTime)) return false;
+            try
+            {
+                value = DateTime.FromFileTimeUtc(fileTime).ToLocalTime();
+                return true;
+            }
+            catch (ArgumentOutOfRangeException) { return false; }
         }
 
         private void ApplyLanguagePreference()
@@ -117,10 +153,15 @@ namespace TS_SE_Tool
 
         public void WriteConfigToFile()
         {
+            WriteConfigToFile(Path.Combine(Directory.GetCurrentDirectory(), "config.cfg"));
+        }
+
+        internal void WriteConfigToFile(string config)
+        {
             string[] exclude = { "CustomPaths", "ProgPrevVersion", "LastUpdateCheck" };
             try
             {
-                using (StreamWriter writer = new StreamWriter(Path.Combine(Directory.GetCurrentDirectory(), "config.cfg"), false, new UTF8Encoding(false)))
+                AtomicFile.Write(config, writer =>
                 {
                     foreach (PropertyInfo property in GetType().GetProperties())
                         if (!exclude.Contains(property.Name))
@@ -134,12 +175,12 @@ namespace TS_SE_Tool
                         writer.WriteLine("CustomPathGame=" + paths.Key);
                         foreach (string path in paths.Value.Distinct()) writer.WriteLine("CustomPath=" + path);
                     }
-                }
+                });
             }
             catch
             {
-                IO_Utilities.LogWriter("Could not write config.cfg to " + Directory.GetCurrentDirectory());
-                UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_could_not_write_to_file", Path.Combine(Directory.GetCurrentDirectory(), "config.cfg"));
+                IO_Utilities.LogWriter("Could not write config.cfg to " + config);
+                UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_could_not_write_to_file", config);
             }
         }
     }

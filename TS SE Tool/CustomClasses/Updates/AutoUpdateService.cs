@@ -5,9 +5,9 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -23,7 +23,11 @@ namespace TS_SE_Tool.Updates
 
         internal static async Task<bool> DownloadAndScheduleAsync(GitHubReleaseInfo release, CancellationToken token)
         {
+            token.ThrowIfCancellationRequested();
             if (release == null || string.IsNullOrEmpty(release.InstallerUrl) || string.IsNullOrEmpty(release.ChecksumsUrl)) return false;
+            if (!GitHubReleaseClient.TryParseSemanticTag(release.TagName, out Version version)
+                || !Regex.IsMatch(release.InstallerName ?? string.Empty, @"^TS-SE-Tool-[0-9.]+-setup\.exe\z", RegexOptions.CultureInvariant))
+                throw new InvalidDataException("The update package has an invalid tag or filename.");
             string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TS-SE-Tool", "Updates", release.TagName);
             Directory.CreateDirectory(root);
             string installer = Path.Combine(root, Path.GetFileName(release.InstallerName));
@@ -33,9 +37,11 @@ namespace TS_SE_Tool.Updates
             string actual = ComputeSha256(installerBytes);
             if (string.IsNullOrEmpty(expected) || !string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("The downloaded update failed SHA-256 verification.");
+            token.ThrowIfCancellationRequested();
             File.WriteAllBytes(installer, installerBytes);
             lock (Sync)
             {
+                token.ThrowIfCancellationRequested();
                 stagedInstaller = installer;
                 if (!exitHooked)
                 {
@@ -62,16 +68,21 @@ namespace TS_SE_Tool.Updates
             catch (Exception exception) { IO_Utilities.ErrorLogWriter("Could not start the staged update: " + exception); }
         }
 
-        private static string FindExpectedHash(string checksums, string fileName)
+        internal static string FindExpectedHash(string checksums, string fileName)
         {
+            if (string.IsNullOrEmpty(fileName)) return null;
+            string expected = null;
             foreach (string line in (checksums ?? string.Empty).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
             {
-                string trimmed = line.Trim();
-                if (!trimmed.EndsWith(fileName, StringComparison.OrdinalIgnoreCase)) continue;
-                string hash = trimmed.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-                if (hash != null && hash.Length == 64) return hash;
+                Match match = Regex.Match(line.Trim(), @"^(?<hash>[a-fA-F0-9]{64})[ \t]+\*?(?<name>.+)$", RegexOptions.CultureInvariant);
+                if (!match.Success || !string.Equals(match.Groups["name"].Value, fileName, StringComparison.Ordinal)) continue;
+                string hash = match.Groups["hash"].Value;
+                // Ambiguous checksums are not a safe basis for installing executable code.
+                if (expected != null && !string.Equals(expected, hash, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("The update has conflicting SHA-256 checksums.");
+                expected = hash;
             }
-            return null;
+            return expected;
         }
 
         private static string ComputeSha256(byte[] data)
