@@ -1039,17 +1039,7 @@ namespace TS_SE_Tool
         /// </summary>
         private static void WriteTextFileAtomic(string _path, string _content)
         {
-            string tempPath = _path + ".tsset_tmp";
-
-            using (StreamWriter writer = new StreamWriter(tempPath, false))
-            {
-                writer.Write(_content);
-            }
-
-            if (File.Exists(_path))
-                File.Delete(_path);
-
-            File.Move(tempPath, _path);
+            AtomicFile.WriteAllText(_path, _content);
         }
 
         //button_save_file

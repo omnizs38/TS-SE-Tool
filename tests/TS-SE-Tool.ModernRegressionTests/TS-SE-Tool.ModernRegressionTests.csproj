@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImportDirectoryBuildTargets>false</ImportDirectoryBuildTargets>
+        <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <Nullable>disable</Nullable>
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="../TS-SE-Tool.RegressionTests/RegressionTests.cs"><Link>RegressionTests.cs</Link></Compile>
+        <Compile Include="../TS-SE-Tool.RegressionTests/TestSupport.cs"><Link>TestSupport.cs</Link></Compile>
+        <Compile Include="../../TS SE Tool/CustomClasses/Utilities/AtomicFile.cs"><Link>AtomicFile.cs</Link></Compile>
+        <Compile Include="../../TS SE Tool/CustomClasses/Program/ProgSettings.cs"><Link>ProgSettings.cs</Link></Compile>
+        <Compile Include="../../TS SE Tool/CustomClasses/Updates/ReleaseValidation.cs"><Link>ReleaseValidation.cs</Link></Compile>
+    </ItemGroup>
+</Project>

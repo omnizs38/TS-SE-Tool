@@ -12,6 +12,8 @@
     <Reference Include="System.Threading.Tasks.Extensions"><HintPath>$(MSBuildThisFileDirectory)packages\System.Threading.Tasks.Extensions.4.6.3\lib\net462\System.Threading.Tasks.Extensions.dll</HintPath><Private>True</Private></Reference>
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Web.Extensions" />
+    <Compile Include="$(MSBuildThisFileDirectory)TS SE Tool\CustomClasses\Utilities\AtomicFile.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TS SE Tool\CustomClasses\Updates\ReleaseValidation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TS SE Tool\CustomClasses\Updates\GitHubReleaseClient.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TS SE Tool\CustomClasses\Updates\AutoUpdateService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TS SE Tool\Forms\FormMainModernUi.cs" />

@@ -249,7 +249,9 @@ namespace TS_SE_Tool
 
 
             //Pickup time intervals
-            numericUpDownSettingPickTimeD.Value = Math.Floor((decimal)(MainForm.ProgSettingsV.JobPickupTime / 24));
+            // 384 hours is represented as 15 days + 24 hours, not an invalid 16-day value.
+            decimal pickupDays = Math.Floor(Math.Max(0, (int)MainForm.ProgSettingsV.JobPickupTime) / 24m);
+            numericUpDownSettingPickTimeD.Value = Math.Min(numericUpDownSettingPickTimeD.Maximum, pickupDays);
             numericUpDownSettingPickTimeH.Value = MainForm.ProgSettingsV.JobPickupTime - numericUpDownSettingPickTimeD.Value * 24;
 
             //Loop width
@@ -270,7 +272,8 @@ namespace TS_SE_Tool
         private void numericUpDownSettingPickTimeH_ValueChanged(object sender, EventArgs e)
         {
 
-            if (numericUpDownSettingPickTimeH.Value == 24)
+            if (numericUpDownSettingPickTimeH.Value == 24
+                && numericUpDownSettingPickTimeD.Value < numericUpDownSettingPickTimeD.Maximum)
             {
                 numericUpDownSettingPickTimeD.Value++;
                 numericUpDownSettingPickTimeH.Value = 0;
