@@ -28,11 +28,11 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\TS SE Tool.exe
-VersionInfoVersion=1.62.0.0
+VersionInfoVersion=1.62.1.0
 VersionInfoCompany=omnizs38 and contributors
 VersionInfoDescription=TS SE Tool Setup
 VersionInfoProductName=TS SE Tool
-VersionInfoProductVersion=1.62.0.0
+VersionInfoProductVersion=1.62.1.0
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
