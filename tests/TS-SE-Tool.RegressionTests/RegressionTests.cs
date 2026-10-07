@@ -144,7 +144,7 @@ internal static class RegressionTests
         Run("non-hex checksum rejected", () => Equal<string>(null, ReleaseValidation.FindExpectedHash(new string('z', 64) + " *" + name, name)));
         Run("conflicting checksums rejected", () => Throws<InvalidDataException>(() => ReleaseValidation.FindExpectedHash(hash + " *" + name + "\n" + new string('b', 64) + " *" + name, name)));
         Run("equivalent checksums accepted", () => Equal(hash.ToUpperInvariant(), ReleaseValidation.FindExpectedHash(hash + " *" + name + "\n" + hash.ToUpperInvariant() + " *" + name, name)));
-#if LEGACY_UPDATER
+#if WINDOWS_UPDATER
         Run("cancelled update stops before download", () => Throws<OperationCanceledException>(() => AutoUpdateService.DownloadAndScheduleAsync(null, new CancellationToken(true)).GetAwaiter().GetResult()));
 #endif
         Console.WriteLine("Passed: " + passed + "; failed: " + failed);

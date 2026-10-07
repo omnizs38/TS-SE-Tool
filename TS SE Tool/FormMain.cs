@@ -1,4 +1,4 @@
-﻿/*
+/*
    Copyright 2016-2022 LIPtoH <liptoh.codebase@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
-using System.Data.SqlServerCe;
+using Microsoft.Data.Sqlite;
 using System.Drawing;
 using System.Linq;
 using System.IO;
@@ -27,7 +27,6 @@ using System.Windows.Forms;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Globalization;
-using System.Deployment.Application;
 using System.Threading;
 
 using TS_SE_Tool.Utilities;
@@ -105,7 +104,7 @@ namespace TS_SE_Tool
 
         private List<ExtCompany> ExternalCompanies;//Program cache
         private List<ExtCargo> ExtCargoList;//Program cache
-        private SqlCeConnection DBconnection;//Program
+        private SqliteConnection DBconnection;//Program
 
         private DateTime LastModifiedTimestamp; //+
 
@@ -180,6 +179,9 @@ namespace TS_SE_Tool
         internal bool ForseExit = false;
 
         #endregion
+
+        internal bool BackgroundCacheBusy => generalWorker?.IsBusy == true;
+        internal Exception BackgroundCacheError { get; private set; }
 
         public FormMain()
         {

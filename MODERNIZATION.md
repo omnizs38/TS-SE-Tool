@@ -1,59 +1,30 @@
-# Stability and modernization workstream
+# .NET 10 / SQLite migration status
 
-## Goal
+## Implemented
 
-Modernize the maintained TS SE Tool without losing save data, introducing unverified native binaries, or silently changing supported Windows versions. This document describes work in progress, not a released feature set.
+- Complete WinForms SDK-style `net10.0-windows` application, PackageReferences and locked production/importer restores.
+- Self-contained `win-x86` publish for the retained audited x86 SII decoder; no separate modern .NET runtime needed.
+- SQLite replaces every SQL CE GUI connection, schema, bulk insert, reference cache, and route query. Native SQL CE is not loaded into the main app.
+- Parameterized inserts, transactions, foreign keys, globally unique SQLite indexes, exact decimal cache values, and real route upserts. Existing city/company/cargo caches can now receive new entries without the old broken list-difference logic or UNION-size limits.
+- Original `.sdf` files remain intact. The isolated read-only net48 importer exports typed rows; staged imports check row counts and foreign keys before publication. Unknown/custom table data is preserved; application metadata is normalized.
+- System.Text.Json replaces System.Web, GZipStream replaces SharpZipLib, and the maintained Windows color dialog replaces the old external OpenPainter binary.
+- Modern cancellation-aware streamed update downloads, checksum validation before atomic staging, Unicode-safe exit installation, and a second on-disk hash check before execution.
+- Compatible preferences plus bounded/secure legacy XML preference import.
+- .NET 10 regression harnesses, SQLite/typed-migration tests, complete-package WinForms/native smoke test, and real synthetic SQL CE import on Windows CI.
 
-## Approved target
+## Deliberately retained compatibility components
 
-The selected target is **.NET 10 LTS with WinForms on Windows 10/11**, not a permanent net48-only application. .NET 10 is the active LTS release; use serviced runtime patches and verify the exact Windows builds against Microsoft's supported-OS matrix before the modern installer is published.
+The main application is not net48. A narrow **optional net48 x86 importer** remains solely because SQL CE has no supported .NET 10 provider. It is not required for normal SQLite operation. The native x86 SII decoder remains attributed and pinned rather than replaced with an unverified binary. These exceptions must be stated honestly in release notes.
 
-This branch does not yet retarget the shipping WinForms application. SQL CE storage and the native decoder need a verified migration strategy first. The current net48 build stays as a regression baseline during the transition.
+## Release gates
 
-## First implementation slice
+- Windows 10/11 game-save no-edit and edited round trips for ETS2 and ATS; save versions 61–97 and unknown blocks/fields.
+- High-DPI/narrow-window interaction, native color selection/reset, and real profile/cache data migration including older schema versions.
+- Installer upgrade/uninstall, runtime-less modern startup, failed-upgrade recovery, optional importer prerequisites, update-after-exit, and OS servicing/ESU compatibility.
+- Multi-file profile/info/game consistency is still not transactional; keep backups and do not claim otherwise.
 
-- Replace delete-then-move save writes with a shared sibling-file writer that flushes data and uses `File.Replace` for existing files. Failed replacement never falls back to deleting the original.
-- Use the same writer for settings so a serialization or filesystem failure preserves the previous configuration.
-- Validate settings field by field: malformed timestamps, non-finite multipliers, and values outside the UI's ranges must not abort loading or overwrite an existing config.
-- Prevent the pickup-time control from overflowing its day limit at 384 hours.
-- Reject overflowing or malformed release versions, exact-match checksum filenames, reject conflicting hashes, and observe cancellation before staging an executable update.
-- Build and run linked-production-code regression tests before packaging in CI.
-- Extract runtime-neutral release validation and run the same file/settings/version/checksum regressions on both .NET Framework 4.8 and .NET 10.
-- Update cache, MSBuild, and NuGet setup actions to their verified Node.js 24 releases; add the current .NET setup action.
+No new version/tag/release is implied by this development migration. Build validation does not replace the manual game/installer gates.
 
-Atomic replacement applies to one file at a time. A profile/info/game save set is not yet a multi-file transaction; existing backups remain necessary. Installer execution and actual game-save round trips still require Windows/manual validation.
+## Sources
 
-## Dependency audit
-
-All eight currently pinned NuGet packages match the latest stable versions in their NuGet flat-container indexes as checked on 2026-10-06. There is no package bump to apply in this slice. See `DEPENDENCIES.md` for the pins and native components. Do not replace discontinued components with unverified forks merely to obtain a newer version number.
-
-## Next slices and gates
-
-1. **Save correctness:** add anonymized/synthetic ETS2 and ATS round-trip fixtures for supported save versions 61–97, unknown fields/blocks, and edited profiles. Add fault-injection coverage for multi-file writes before designing rollback.
-2. **Lifecycle and responsiveness:** audit cancellation on form disposal, resource ownership, and database reader/command disposal; replace remaining blocking UI work only where it is measured or reproducible.
-3. **Build modernization:** evaluate SDK-style projects and `PackageReference` while retaining net48 as a transitional baseline. Verify WinForms resources/designers, binding redirects, and SQL CE native packaging before switching.
-4. **Storage migration:** map the current `.sdf` data and SQL CE bulk-copy call sites; prototype a supported replacement such as SQLite. Specify import/rebuild, rollback, and performance requirements before removing SQL CE.
-5. **Modern .NET:** migrate WinForms to .NET 10 LTS for Windows 10/11 after validating storage and native-decoder replacements. Decide whether x86 decoding needs isolation in a separate process or can be safely retained in-process. Validate the modern installer, runtime distribution, and upgrade path from existing net48 installs.
-6. **Release:** verify Windows builds, portable/setup packaging, checksum generation, real ETS2/ATS no-edit and edited round trips, and DPI layouts. Do not merge or publish until required checks pass.
-
-## Run regression tests
-
-On Windows with Visual Studio 2022 Build Tools and the .NET Framework 4.8 targeting pack:
-
-```powershell
-msbuild 'tests/TS-SE-Tool.RegressionTests/TS-SE-Tool.RegressionTests.csproj' /m /p:Configuration=Release
-& './tests/TS-SE-Tool.RegressionTests/bin/Release/TS-SE-Tool.RegressionTests.exe'
-# With the .NET 10 SDK installed:
-dotnet run --project 'tests/TS-SE-Tool.ModernRegressionTests/TS-SE-Tool.ModernRegressionTests.csproj' --configuration Release
-```
-
-The harness links the production implementations directly and supplies only UI/logging adapters. Tests use temporary synthetic files and do not need personal profiles, live GitHub downloads, or installer execution.
-
-## Decisions still needed
-
-- Verify which Windows 10/11 builds and servicing channels are supported by the chosen .NET 10 release. Windows 10 servicing/ESU requirements must not be confused with application compatibility.
-- Should existing `.sdf` databases be imported, regenerated from source data, or retained by a separate migration utility? Assess which contain user-created data before deciding.
-
-## Platform source
-
-[Microsoft .NET support policy](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core) identifies .NET 10 as the active LTS line. The cross-runtime tests are a migration gate, not evidence that SQL CE, WinForms designers, the decoder, or the full shipping application already work on modern .NET.
+[Microsoft .NET support policy](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core) identifies .NET 10 as the active LTS line. Use serviced runtime patches and supported Windows builds. The native/legacy component provenance is documented in `DEPENDENCIES.md` and `NOTICE`.

@@ -18,6 +18,13 @@ namespace TS_SE_Tool
     {
         private readonly FormMain mainForm = Application.OpenForms.OfType<FormMain>().FirstOrDefault();
         private string releaseUrl = Web_Utilities.ReleasesUrl;
+        private readonly CancellationTokenSource lifetime = new CancellationTokenSource();
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            lifetime.Cancel();
+            base.OnFormClosed(e);
+        }
 
         public FormSplash()
         {
@@ -47,9 +54,11 @@ namespace TS_SE_Tool
             linkLabelNewVersion.Enabled = false;
             try
             {
-                using (CancellationTokenSource checkCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20)))
+                using (CancellationTokenSource checkCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token))
                 {
+                    checkCancellation.CancelAfter(TimeSpan.FromSeconds(20));
                     GitHubReleaseInfo latest = await GitHubReleaseClient.GetLatestStableAsync(checkCancellation.Token);
+                    if (IsDisposed || lifetime.IsCancellationRequested) return;
                     if (latest != null && GitHubReleaseClient.IsNewer(latest))
                     {
                         releaseUrl = latest.Url;
@@ -59,9 +68,11 @@ namespace TS_SE_Tool
                         if (Properties.Settings.Default.AutoInstallUpdates)
                         {
                             linkLabelNewVersion.Text = "Downloading verified update " + latest.TagName + "…";
-                            using (CancellationTokenSource downloadCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(5)))
+                            using (CancellationTokenSource downloadCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token))
                             {
+                                downloadCancellation.CancelAfter(TimeSpan.FromMinutes(20));
                                 bool staged = await AutoUpdateService.DownloadAndScheduleAsync(latest, downloadCancellation.Token);
+                                if (IsDisposed || lifetime.IsCancellationRequested) return;
                                 linkLabelNewVersion.Text = staged
                                     ? latest.TagName + " downloaded — it will install silently after exit"
                                     : "Automatic package unavailable — open " + latest.TagName;
@@ -71,8 +82,10 @@ namespace TS_SE_Tool
                     else HideUpdateRow();
                 }
             }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
             catch (Exception exception)
             {
+                if (IsDisposed || lifetime.IsCancellationRequested) return;
                 IO_Utilities.ErrorLogWriter("Startup update failed: " + exception);
                 linkLabelNewVersion.Text = "Automatic update unavailable — open GitHub Releases";
                 linkLabelNewVersion.Enabled = true;

@@ -58,8 +58,8 @@ namespace TS_SE_Tool
             description.AppendLine("Third-party components:");
             description.AppendLine("SII_Decrypt — github.com/ncs-sniper/SII_Decrypt");
             description.AppendLine("PsColorPicker — github.com/exectails/PsColorPicker");
-            description.AppendLine("SharpZipLib — github.com/icsharpcode/SharpZipLib");
-            description.AppendLine("SqlCeBulkCopy — github.com/ErikEJ/SqlCeBulkCopy");
+            description.AppendLine("Microsoft.Data.Sqlite — github.com/dotnet/efcore");
+            description.AppendLine("SQL Server Compact — optional read-only legacy migration helper");
             description.AppendLine("DDSImageParser, TGASharpLib, FlexibleMessageBox");
             description.AppendLine();
             description.AppendLine("See LICENSE and NOTICE for required attribution.");

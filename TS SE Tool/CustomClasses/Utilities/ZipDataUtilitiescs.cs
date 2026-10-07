@@ -1,4 +1,4 @@
-﻿/*
+/*
    Copyright 2016-2022 LIPtoH <liptoh.codebase@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,11 +14,9 @@
    limitations under the License.
 */
 using System;
-using System.Windows.Forms;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using ICSharpCode.SharpZipLib.GZip;
 
 namespace TS_SE_Tool.Utilities
 {
@@ -29,27 +27,17 @@ namespace TS_SE_Tool.Utilities
             if (_text == null)
                 return null;
 
-            using (Stream memOutput = new MemoryStream())            
-                using (GZipOutputStream zipOut = new GZipOutputStream(memOutput))                
-                    using (StreamWriter writer = new StreamWriter(zipOut))
-                    {
-                        writer.Write(_text);
-
-                        writer.Flush();
-                        zipOut.Finish();
-
-                        byte[] bytes = new byte[memOutput.Length];
-                        memOutput.Seek(0, SeekOrigin.Begin);
-                        memOutput.Read(bytes, 0, bytes.Length);
-
-                        return bytes;
-                    }
-
-
+            using (MemoryStream output = new MemoryStream())
+            {
+                using (GZipStream gzip = new GZipStream(output, CompressionLevel.Optimal, true))
+                using (StreamWriter writer = new StreamWriter(gzip)) writer.Write(_text);
+                return output.ToArray();
+            }
         }
 
         internal static string unzipText(string _sbytes)
         {
+            if (string.IsNullOrEmpty(_sbytes) || _sbytes.Length % 2 != 0) return null;
             string[] pairs = new string[_sbytes.Length / 2];
             byte[] bytes;
 
@@ -74,7 +62,7 @@ namespace TS_SE_Tool.Utilities
                 return null;
 
             using (Stream memInput = new MemoryStream(bytes))
-                using (GZipInputStream zipInput = new GZipInputStream(memInput))
+                using (GZipStream zipInput = new GZipStream(memInput, CompressionMode.Decompress))
                     using (StreamReader reader = new StreamReader(zipInput))
                     {
                         string text = reader.ReadToEnd();
