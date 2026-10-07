@@ -15,7 +15,7 @@ internal static class Program
             string source = Path.GetFullPath(args[0]);
             string output = Path.GetFullPath(args[1]);
             if (!File.Exists(source) || File.Exists(output) || source == output) throw new IOException("Invalid export paths.");
-            using (SqlCeConnection connection = new SqlCeConnection(new SqlCeConnectionStringBuilder { DataSource = source, FileMode = "Read Only" }.ToString()))
+            using (SqlCeConnection connection = new SqlCeConnection(new SqlCeConnectionStringBuilder { DataSource = source, FileMode = "Read Only", TempFilePath = Path.GetTempPath() }.ToString()))
             using (DataSet data = new DataSet("LegacyDatabase"))
             {
                 connection.Open();
