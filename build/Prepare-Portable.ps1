@@ -35,7 +35,10 @@ foreach ($file in @('heavy_cargoes.csv', 'HowTo.pdf')) {
     if (Test-Path $source) { Copy-Item $source $portable -Force }
 }
 
-Copy-Item (Join-Path $PSScriptRoot '../TS SE Tool/bin/Release/*') $portable -Recurse -Force
+Copy-Item (Join-Path $PSScriptRoot '../artifacts/publish/*') $portable -Recurse -Force
+$migration = Join-Path $portable 'migration'
+New-Item -ItemType Directory -Force -Path $migration | Out-Null
+Copy-Item (Join-Path $PSScriptRoot '../tools/LegacySqlCeExport/bin/Release/net48/*') $migration -Recurse -Force
 foreach ($file in @('LICENSE', 'NOTICE', 'README.md', 'DEPENDENCIES.md', 'COMPATIBILITY.md')) {
     Copy-Item (Join-Path $PSScriptRoot "../$file") $portable -Force
 }
@@ -45,10 +48,13 @@ Get-ChildItem $portable -File -Include *.pdb,*.log,*.xml -Recurse | Remove-Item 
 
 $exe = Join-Path $portable 'TS SE Tool.exe'
 if (-not (Test-Path $exe)) { throw "Expected executable was not produced: $exe" }
-$fileVersion = (Get-Item $exe).VersionInfo.FileVersion
+$fileVersion = (Get-Item (Join-Path $portable 'TS SE Tool.dll')).VersionInfo.FileVersion
 $expectedAssemblyVersion = ($PackageVersion -split '-', 2)[0]
 if ($fileVersion -notlike "$expectedAssemblyVersion.*") {
     throw "Unexpected executable version: $fileVersion (expected $expectedAssemblyVersion.x)"
+}
+foreach ($file in @('TS SE Tool.runtimeconfig.json', 'TS SE Tool.deps.json', 'coreclr.dll', 'e_sqlite3.dll', 'libs/SII_Decrypt.dll', 'migration/LegacySqlCeExport.exe')) {
+    if (-not (Test-Path (Join-Path $portable $file))) { throw "Portable package is missing $file." }
 }
 foreach ($directory in @('img', 'lang', 'libs')) {
     if (-not (Test-Path (Join-Path $portable $directory))) { throw "Portable package is missing $directory." }

@@ -6,9 +6,10 @@
 */
 using System;
 using System.Drawing;
-using System.Net;
 using System.Reflection;
 using System.Threading;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using TS_SE_Tool.Utilities;
 
@@ -19,13 +20,22 @@ namespace TS_SE_Tool
         [STAThread]
         private static void Main(string[] args)
         {
+            NativeLibrary.SetDllImportResolver(typeof(Program).Assembly, (name, assembly, searchPath) =>
+                name == @"libs/SII_Decrypt.dll" ? NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "libs", "SII_Decrypt.dll")) : IntPtr.Zero);
+            if (args.Length > 0 && args[0] == "--smoke-test")
+            {
+                Environment.ExitCode = Diagnostics.ModernSmokeTest.Run(args);
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "--selftest", StringComparison.OrdinalIgnoreCase))
             {
                 Environment.ExitCode = Diagnostics.SelfTest.Run(args);
                 return;
             }
 
-            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+            UserSettingsMigration.ImportIfNeeded();
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.ThreadException += UIThreadException;
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             AppDomain.CurrentDomain.UnhandledException += CurrentDomainUnhandledException;
@@ -35,7 +45,6 @@ namespace TS_SE_Tool
                 IO_Utilities.LogWriter("--- START ---");
                 IO_Utilities.LogWriter(AssemblyData.AssemblyProduct + " - " + AssemblyData.AssemblyVersion);
                 DetectEnviroment.DetectOS();
-                DetectEnviroment.Get45PlusFromRegistry();
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 

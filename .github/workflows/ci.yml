@@ -31,12 +31,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up MSBuild
-        uses: microsoft/setup-msbuild@v3
-
-      - name: Set up NuGet
-        uses: NuGet/setup-nuget@v4
-
       - name: Set up .NET 10 LTS
         uses: actions/setup-dotnet@v6
         with:
@@ -45,32 +39,35 @@ jobs:
       - name: Cache NuGet packages
         uses: actions/cache@v6
         with:
-          path: packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/packages.config') }}
-          restore-keys: nuget-${{ runner.os }}-
+          path: ~/.nuget/packages
+          key: nuget-net10-${{ runner.os }}-${{ hashFiles('**/packages.lock.json', '**/*.csproj') }}
+          restore-keys: nuget-net10-${{ runner.os }}-
 
-      - name: Restore current dependencies
-        shell: pwsh
-        run: nuget restore "$env:SOLUTION_FILE" -NonInteractive
-
-      - name: Build release
-        shell: pwsh
-        run: >-
-          msbuild "$env:SOLUTION_FILE"
-          /m
-          /p:Configuration=$env:BUILD_CONFIGURATION
-          /p:Platform="Any CPU"
-          /p:Deterministic=true
-
-      - name: Build and run stability regression tests on legacy and modern .NET
+      - name: Build and publish complete .NET 10 application
         shell: pwsh
         run: |
-          msbuild 'tests/TS-SE-Tool.RegressionTests/TS-SE-Tool.RegressionTests.csproj' /m /p:Configuration=Release
-          if ($LASTEXITCODE -ne 0) { throw "Regression test build failed with exit code $LASTEXITCODE" }
-          & './tests/TS-SE-Tool.RegressionTests/bin/Release/TS-SE-Tool.RegressionTests.exe'
-          if ($LASTEXITCODE -ne 0) { throw "Regression tests failed with exit code $LASTEXITCODE" }
+          function Invoke-Checked([string[]] $Arguments) {
+            $output = & dotnet @Arguments 2>&1
+            $exit = $LASTEXITCODE
+            $output | ForEach-Object { Write-Output $_ }
+            if ($exit -ne 0) {
+              $detail = ($output | Select-Object -Last 18 | Out-String).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+              Write-Output "::error::$detail"
+              throw "dotnet failed with exit code $exit"
+            }
+          }
+          Invoke-Checked @('publish','TS SE Tool/TS SE Tool.csproj','-c','Release','-r','win-x86','--self-contained','true','-o','artifacts/publish','-p:RestoreLockedMode=true')
+          Invoke-Checked @('build','tools/LegacySqlCeExport/LegacySqlCeExport.csproj','-c','Release','-p:RestoreLockedMode=true')
+
+      - name: Run .NET 10 production-code regressions
+        shell: pwsh
+        run: |
+          dotnet run --project 'tests/TS-SE-Tool.RegressionTests/TS-SE-Tool.RegressionTests.csproj' --configuration Release
+          if ($LASTEXITCODE -ne 0) { throw "Windows updater/config regressions failed" }
           dotnet run --project 'tests/TS-SE-Tool.ModernRegressionTests/TS-SE-Tool.ModernRegressionTests.csproj' --configuration Release
-          if ($LASTEXITCODE -ne 0) { throw ".NET 10 regression tests failed with exit code $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Shared regressions failed" }
+          dotnet run --project 'tests/TS-SE-Tool.StorageTests/TS-SE-Tool.StorageTests.csproj' --configuration Release
+          if ($LASTEXITCODE -ne 0) { throw "SQLite/migration regressions failed" }
 
       - name: Determine package version
         shell: pwsh
@@ -87,6 +84,26 @@ jobs:
       - name: Assemble portable package
         shell: pwsh
         run: ./build/Prepare-Portable.ps1 -PackageVersion $env:PACKAGE_VERSION
+
+      - name: Smoke-test packaged WinForms, x86 decoder, and real SQL CE migration
+        shell: pwsh
+        run: |
+          $smoke = Join-Path $env:RUNNER_TEMP 'tsset-net10-smoke'
+          Copy-Item 'artifacts/portable' $smoke -Recurse -Force
+          $fixture = Join-Path $env:RUNNER_TEMP 'legacy-fixture.sdf'
+          & "$smoke/migration/LegacySqlCeExport.exe" --create-fixture $fixture
+          if ($LASTEXITCODE -ne 0) { throw "Could not create SQL CE migration fixture" }
+          $exe = Join-Path $smoke 'TS SE Tool.exe'
+          $process = Start-Process -FilePath $exe -ArgumentList @('--smoke-test', ('"' + $fixture + '"')) -PassThru
+          if (-not $process.WaitForExit(300000)) { $process.Kill(); throw "Packaged application smoke test timed out" }
+          $result = Join-Path $smoke 'smoke-test-result.txt'
+          if (Test-Path $result) { Get-Content $result }
+          if ($process.ExitCode -ne 0) {
+            $detail = if (Test-Path $result) { (Get-Content $result -Raw) } else { 'Application exited before writing its smoke report' }
+            $escaped = $detail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error::$escaped"
+            throw "Packaged application smoke test failed"
+          }
 
       - name: Build installer
         shell: pwsh

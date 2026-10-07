@@ -1,4 +1,4 @@
-﻿/*
+/*
    Copyright 2016-2022 LIPtoH <liptoh.codebase@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,6 +40,8 @@ namespace TS_SE_Tool
 
             sbyte saveFileFormat = returnData.saveFileFormat;
             byte[] fileDataInBytes = returnData.fileDataInBytes;
+            if (fileDataInBytes == null) return null;
+            FileDecoded = false;
             UInt32 buff = (UInt32)fileDataInBytes.Length;
 
             switch (saveFileFormat)
@@ -49,7 +51,7 @@ namespace TS_SE_Tool
                     {
                         FileDecoded = true;
                         string BigS = Encoding.UTF8.GetString(fileDataInBytes);
-                        return BigS.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+                        return BigS.Replace("\r\n", "\n").Split('\n');
                     }
                 case 2:
                     // "SIIDEC_RESULT_FORMAT_ENCRYPTED";
@@ -70,19 +72,21 @@ namespace TS_SE_Tool
 
                         if (result == 0)
                         {
-                            byte[] newFileData = new byte[(int)newbuff];
+                            if (newbuff == 0 || newbuff > 512U * 1024 * 1024) return null;
+                            byte[] newFileData = new byte[checked((int)newbuff)];
 
                             fixed (byte* ptr = fileDataInBytes)
                             {
                                 fixed (byte* ptr2 = newFileData)
                                     result = SIIDecryptAndDecodeMemory(ptr, buff, ptr2, newbuffP);
                             }
+                            if (result != 0) return null;
                             if (_verbose)
                                 UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Clear);
 
                             FileDecoded = true;
                             string BigS = Encoding.UTF8.GetString(newFileData);
-                            return BigS.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+                            return BigS.Replace("\r\n", "\n").Split('\n');
 
                         }
 
@@ -109,19 +113,21 @@ namespace TS_SE_Tool
 
                         if (result == 0)
                         {
-                            byte[] newFileData = new byte[(int)newbuff];
+                            if (newbuff == 0 || newbuff > 512U * 1024 * 1024) return null;
+                            byte[] newFileData = new byte[checked((int)newbuff)];
 
                             fixed (byte* ptr = fileDataInBytes)
                             {
                                 fixed (byte* ptr2 = newFileData)
                                     result = SIIDecodeMemory(ptr, buff, ptr2, newbuffP);
                             }
+                            if (result != 0) return null;
                             if (_verbose)
                                 UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Clear);
 
                             FileDecoded = true;
                             string BigS = Encoding.UTF8.GetString(newFileData);
-                            return BigS.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+                            return BigS.Replace("\r\n", "\n").Split('\n');
                         }
                         return null;
                     }

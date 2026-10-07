@@ -27,12 +27,20 @@ OutputBaseFilename=TS-SE-Tool-{#MyAppVersion}-setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+MinVersion=10.0.17763
 UninstallDisplayIcon={app}\TS SE Tool.exe
 VersionInfoVersion=1.62.1.0
 VersionInfoCompany=omnizs38 and contributors
 VersionInfoDescription=TS SE Tool Setup
 VersionInfoProductName=TS SE Tool
 VersionInfoProductVersion=1.62.1.0
+
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\libs\x86"
+Type: filesandordirs; Name: "{app}\libs\amd64"
+Type: files; Name: "{app}\libs\System.Data.SqlServerCe.dll"
+Type: files; Name: "{app}\libs\OpenPainter.ColorPicker.dll"
+Type: files; Name: "{app}\libs\ICSharpCode.SharpZipLib.dll"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

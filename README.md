@@ -31,19 +31,22 @@ Each tagged release produces two Windows packages:
 - `TS-SE-Tool-<version>-portable.zip` — extract and run
 - `TS-SE-Tool-<version>-setup.exe` — per-user installer with optional shortcuts
 
-Both are built on GitHub's current `windows-2025` hosted image with the latest Visual Studio/MSBuild image. GitHub does not offer a hosted Windows 11 desktop runner; Windows Server 2025 is the current supported hosted build environment, while the generated application manifest and packages target Windows 10/11 x64-compatible systems.
+Both are built on GitHub's current `windows-2025` hosted image using the .NET 10 SDK. GitHub does not offer a hosted Windows 11 desktop runner; Windows Server 2025 is the current supported hosted build environment, while the generated application manifest and packages target Windows 10/11 x64-compatible systems.
 
 ## Requirements
 
 - Windows 10 or Windows 11, x64-compatible
-- .NET Framework 4.8
-- Visual Studio 2022/2025 build tools with the .NET desktop workload for local builds
+- No separate .NET installation for the self-contained .NET 10 application
+- The optional one-time `.sdf` importer requires .NET Framework 4.8; normal operation and new SQLite databases do not
+- .NET 10 SDK for local builds (Windows is required to run WinForms/native tests)
 
 ## Build
 
 ```powershell
-nuget restore "TS SE Tool.sln" -NonInteractive
-msbuild "TS SE Tool.sln" /m /p:Configuration=Release /p:Platform="Any CPU"
+dotnet publish "TS SE Tool/TS SE Tool.csproj" -c Release -r win-x86 --self-contained true -o artifacts/publish -p:RestoreLockedMode=true
+dotnet build "tools/LegacySqlCeExport/LegacySqlCeExport.csproj" -c Release -p:RestoreLockedMode=true
+dotnet run --project tests/TS-SE-Tool.RegressionTests -c Release
+dotnet run --project tests/TS-SE-Tool.StorageTests -c Release
 ```
 
 See [DEPENDENCIES.md](DEPENDENCIES.md) for package versions and native-component provenance.
@@ -66,3 +69,15 @@ The diagnostic does not write into the source save directory. Never attach perso
 ## License and attribution
 
 Licensed under Apache-2.0. Required upstream and third-party attribution is retained in [LICENSE](LICENSE) and [NOTICE](NOTICE); stale runtime branding, update endpoints and executable updater code are not.
+
+## .NET 10 / SQLite migration
+
+The development application uses an SDK-style `net10.0-windows` project, modern PackageReferences, System.Text.Json, BCL GZipStream, and Microsoft.Data.Sqlite. It is self-contained **win-x86** because the audited SII decoder is x86; it runs on x64-compatible Windows 10/11. The installer requires Windows 10 build 17763 or newer. OS servicing/support requirements still apply.
+
+On first use, a sibling legacy `.sdf` is read by the isolated `migration/LegacySqlCeExport.exe` compatibility utility, then imported into a staged `.sqlite`. The original `.sdf` is never deleted or overwritten. Row counts and foreign keys are checked before the new database is published. Unknown/custom tables are copied, while application metadata is normalized to the current schema. If the importer, runtime, or source data is unavailable/invalid, migration fails without publishing an empty replacement. Back up the `dbs`, `gameref/cache`, `config.cfg`, and game profiles before upgrading.
+
+Existing startup/update preferences are imported from the known legacy company/application user.config folders when no modern preferences.json exists. Original preference files remain untouched. If an installation used a different historical company/application identity, verify those three preferences manually.
+
+The maintained Windows color dialog replaces the old external OpenPainter binary, retaining color selection and transparent/reset behavior. Legacy SQL CE native files are confined to the optional importer, not the application's runtime dependencies.
+
+CI builds the complete application, runs Windows updater/settings and shared/SQLite regressions, and smoke-tests the actual packaged WinForms resources, native decoder, and a synthetic SQL CE-to-SQLite migration. Real ETS2/ATS saves, high-DPI interaction, and installer upgrade/rollback remain manual release gates; a green build alone is not a claim that all game scenarios were tested.

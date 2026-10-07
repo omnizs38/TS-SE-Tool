@@ -1,28 +1,28 @@
 # Dependency policy
 
-The application targets .NET Framework 4.8 because SQL Server Compact and the native SII decoder remain Windows-only dependencies. Packages are restored from NuGet; generated DLLs are not committed.
+## Main application
 
-## NuGet packages
+The entire WinForms application targets **.NET 10 LTS** through an SDK-style project and modern PackageReferences. Self-contained `win-x86` packages include the serviced .NET runtime; users do not install a separate .NET 10 runtime. Package lock files are committed, and CI restores production/importer dependencies in locked mode.
 
-| Package | Version | Notes |
+| Package | Version | Purpose |
 | --- | ---: | --- |
-| ErikEJ.SqlCeBulkCopy | 2.1.6.15 | Latest published compatible release |
-| Microsoft.SqlServer.Compact | 4.0.8876.1 | Latest published SQL CE 4 package |
-| SharpZipLib | 1.4.2 | Latest published stable release |
-| System.Buffers | 4.6.1 | Latest published stable release |
-| System.Memory | 4.6.3 | Latest published stable release |
-| System.Numerics.Vectors | 4.6.1 | Latest published stable release |
-| System.Runtime.CompilerServices.Unsafe | 6.1.2 | Latest stable line compatible with .NET Framework 4.8 |
-| System.Threading.Tasks.Extensions | 4.6.3 | Latest published stable release |
+| Microsoft.Data.Sqlite | 10.0.12 | SQLite storage; SQLitePCLRaw/native SQLite are transitive dependencies |
+| System.Resources.Extensions | 10.0.12 | Existing attributed WinForms/icon resources |
 
-Dependabot monitors NuGet and GitHub Actions updates.
+System.Text.Json and GZipStream come from .NET 10. The main app no longer references SQL Server Compact, SqlCeBulkCopy, SharpZipLib, OpenPainter.ColorPicker.dll, System.Web.Extensions, or the old Framework support packages.
 
-## Bundled native/legacy components
+## Optional one-time legacy importer
 
-- `SII_Decrypt.dll` is required for SCS encrypted/binary saves. The upstream project is discontinued and does not publish a newer verified binary release, so this binary is retained rather than replaced with an unverified fork.
-- `OpenPainter.ColorPicker.dll` supplies controls used by the in-tree attributed color-picker implementation. No newer compatible package is published.
-- SQL Server Compact native x86/amd64 binaries come from the pinned NuGet package during each build.
+`tools/LegacySqlCeExport` is a separate **net48 x86** console executable. It uses Microsoft.SqlServer.Compact **4.0.8876.1** to read old `.sdf` files in read-only mode and export typed XML. Microsoft.NETFramework.ReferenceAssemblies.net48 **1.0.3** is a private build dependency. The importer is required only for old SQL CE data; normal application/database operation is entirely .NET 10 + SQLite.
 
-## Runtime data provenance
+Do not represent this utility as a modern SQL CE driver. SQL CE has no supported .NET 10 provider. Keeping a narrow read-only compatibility executable is deliberate; it preserves user data without loading the unsupported provider into the modern GUI. Required legacy runtime/redistributable components must be available for this optional operation.
 
-The `img`, `lang`, `gameref` and optional `dbs` data were distributed under the project's Apache-2.0 upstream release `LIPtoH/TS-SE-Tool v0.3.11.0`. Packaging verifies SHA-256 `0732cd4d861bd53b1570b90ecf928bc085e8b627c16db35edc9a0324d616b0da` and copies only those allowlisted data directories. Old executables, DLLs, configuration, logs and the legacy updater are never copied. Runtime update checks and all user-facing links point only to `omnizs38/TS-SE-Tool`.
+## Native decoder
+
+The pinned, attributed `SII_Decrypt.dll` remains the existing audited x86 native binary. Its upstream is discontinued and has no newer verified release. The .NET 10 app explicitly resolves it from `libs/SII_Decrypt.dll`, validates decode return codes, and bounds decoded output. Do not replace it with an unverified fork. Do not retarget the GUI to x64 without a verified replacement or isolated x86 decoder host.
+
+## Runtime assets and licenses
+
+The `img`, `lang`, `gameref`, and optional `dbs` assets originate from attributed upstream `LIPtoH/TS-SE-Tool v0.3.11.0`; packaging verifies SHA-256 `0732cd4d861bd53b1570b90ecf928bc085e8b627c16db35edc9a0324d616b0da` and copies only allowlisted data. Upstream executable/DLL/updater/config files are not imported. Preserve LICENSE and NOTICE. Historical third-party notices remain for derived code; removed binary dependencies are not part of the new application's dependency graph.
+
+Dependabot monitors current SDK-style NuGet projects and GitHub Actions.

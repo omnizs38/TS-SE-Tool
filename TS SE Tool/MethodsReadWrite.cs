@@ -1,4 +1,4 @@
-﻿/*
+/*
    Copyright 2016-2022 LIPtoH <liptoh.codebase@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,8 @@ using System;
 using System.IO;
 using System.Globalization;
 using System.Windows.Forms;
-using System.Data.SqlServerCe;
+using Microsoft.Data.Sqlite;
+using TS_SE_Tool.Storage;
 using System.Threading;
 using System.Drawing;
 using System.Linq;
@@ -606,10 +607,10 @@ namespace TS_SE_Tool
 
             if (File.Exists(SiiSavePath))
             {
-                string dbPath = "dbs/" + GameType + "." + Path.GetFileName(Globals.SelectedProfilePath) + ".sdf";
-                DBconnection = new SqlCeConnection("Data Source = " + dbPath);
-
+                string dbPath = "dbs/" + GameType + "." + Path.GetFileName(Globals.SelectedProfilePath) + ".sqlite";
+                DBconnection?.Dispose();
                 CreateDatabase(dbPath);
+                DBconnection = SqliteStorage.OpenConnection(dbPath);
             }                
             else
             {
@@ -1207,6 +1208,11 @@ namespace TS_SE_Tool
             generalWorker = new BackgroundWorker();
             generalWorker.WorkerReportsProgress = false;
             generalWorker.DoWork += CacheExternalGameData;
+            generalWorker.RunWorkerCompleted += (sender, result) =>
+            {
+                BackgroundCacheError = result.Error;
+                if (result.Error != null) IO_Utilities.ErrorLogWriter("Game-reference cache failed: " + result.Error);
+            };
             generalWorker.RunWorkerAsync();
         }
 
@@ -1226,7 +1232,7 @@ namespace TS_SE_Tool
 
                         foreach (string dlcFolder in dlcFolders)
                         {
-                            string dbfilepath = Directory.GetCurrentDirectory() + @"\gameref\cache\" + gamename + "\\" + new DirectoryInfo(dlcFolder).Name + ".sdf";
+                            string dbfilepath = Directory.GetCurrentDirectory() + @"\gameref\cache\" + gamename + "\\" + new DirectoryInfo(dlcFolder).Name + ".sqlite";
 
                             if (!File.Exists(dbfilepath) || (new FileInfo(dbfilepath).LastWriteTime < new FileInfo(dlcFolder).LastWriteTime))
                             {
