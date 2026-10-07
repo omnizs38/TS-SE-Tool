@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.IO;
 using System.Linq;
 using TS_SE_Tool.Utilities;
@@ -13,7 +12,7 @@ namespace TS_SE_Tool
         {
             try
             {
-                string current = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.PerUserRoamingAndLocal).FilePath;
+                string current = Properties.Settings.PreferencesPath;
                 if (File.Exists(current)) return;
                 string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 string company = Path.Combine(local, "omnizs38 and contributors");

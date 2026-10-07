@@ -119,6 +119,18 @@ internal static class Program
                     Check(threw); Check(Scalar(connection, "SELECT count(*) FROM CompaniesInCitysTable") == 0); Check(Scalar(connection, "PRAGMA foreign_keys") == 1);
                 }
             });
+            Test("atomic JSON preference round trip", () =>
+            {
+                string path = Path.Combine(root, "preferences.json");
+                var saved = new TS_SE_Tool.Properties.Settings { ShowSplashOnStartup = false, CheckUpdatesOnStartup = false, AutoInstallUpdates = true };
+                saved.Save(path); var loaded = TS_SE_Tool.Properties.Settings.Read(path);
+                Check(!loaded.ShowSplashOnStartup && !loaded.CheckUpdatesOnStartup && loaded.AutoInstallUpdates);
+            });
+            Test("malformed preferences preserved and automatic execution disabled", () =>
+            {
+                string path = Path.Combine(root, "broken-preferences.json"); File.WriteAllText(path, "not-json");
+                Check(!TS_SE_Tool.Properties.Settings.Read(path).AutoInstallUpdates); Check(File.ReadAllText(path) == "not-json");
+            });
             Test("legacy preferences preserve disabled updates", () =>
             {
                 string path = Path.Combine(root, "user.config"); File.WriteAllText(path, "<configuration><userSettings><TS_SE_Tool.Properties.Settings><setting name='AutoInstallUpdates'><value>False</value></setting><setting name='CheckUpdatesOnStartup'><value>False</value></setting></TS_SE_Tool.Properties.Settings></userSettings></configuration>");

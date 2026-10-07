@@ -76,7 +76,7 @@ The development application uses an SDK-style `net10.0-windows` project, modern 
 
 On first use, a sibling legacy `.sdf` is read by the isolated `migration/LegacySqlCeExport.exe` compatibility utility, then imported into a staged `.sqlite`. The original `.sdf` is never deleted or overwritten. Row counts and foreign keys are checked before the new database is published. Unknown/custom tables are copied, while application metadata is normalized to the current schema. If the importer, runtime, or source data is unavailable/invalid, migration fails without publishing an empty replacement. Back up the `dbs`, `gameref/cache`, `config.cfg`, and game profiles before upgrading.
 
-Existing startup/update preferences are imported from the known legacy company/application user.config folders when no modern user.config exists. Original preference files remain untouched. If an installation used a different historical company/application identity, verify those three preferences manually.
+Existing startup/update preferences are imported from the known legacy company/application user.config folders when no modern preferences.json exists. Original preference files remain untouched. If an installation used a different historical company/application identity, verify those three preferences manually.
 
 The maintained Windows color dialog replaces the old external OpenPainter binary, retaining color selection and transparent/reset behavior. Legacy SQL CE native files are confined to the optional importer, not the application's runtime dependencies.
 

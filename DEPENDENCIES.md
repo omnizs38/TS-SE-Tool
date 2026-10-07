@@ -7,7 +7,6 @@ The entire WinForms application targets **.NET 10 LTS** through an SDK-style pro
 | Package | Version | Purpose |
 | --- | ---: | --- |
 | Microsoft.Data.Sqlite | 10.0.12 | SQLite storage; SQLitePCLRaw/native SQLite are transitive dependencies |
-| System.Configuration.ConfigurationManager | 10.0.12 | Compatible user preference storage/import |
 | System.Resources.Extensions | 10.0.12 | Existing attributed WinForms/icon resources |
 
 System.Text.Json and GZipStream come from .NET 10. The main app no longer references SQL Server Compact, SqlCeBulkCopy, SharpZipLib, OpenPainter.ColorPicker.dll, System.Web.Extensions, or the old Framework support packages.

@@ -9,7 +9,7 @@
 - Original `.sdf` files remain intact. The isolated read-only net48 importer exports typed rows; staged imports check row counts and foreign keys before publication. Unknown/custom table data is preserved; application metadata is normalized.
 - System.Text.Json replaces System.Web, GZipStream replaces SharpZipLib, and the maintained Windows color dialog replaces the old external OpenPainter binary.
 - Modern cancellation-aware streamed update downloads, checksum validation before atomic staging, Unicode-safe exit installation, and a second on-disk hash check before execution.
-- Compatible preferences plus bounded/secure legacy XML preference import.
+- JSON preferences stored atomically in local application data, with bounded/secure legacy XML import. Automatic installation is opt-in when legacy preferences cannot be recovered.
 - .NET 10 regression harnesses, SQLite/typed-migration tests, complete-package WinForms/native smoke test, and real synthetic SQL CE import on Windows CI.
 
 ## Deliberately retained compatibility components
