@@ -46,10 +46,18 @@ jobs:
       - name: Build and publish complete .NET 10 application
         shell: pwsh
         run: |
-          dotnet publish 'TS SE Tool/TS SE Tool.csproj' -c Release -r win-x86 --self-contained true -o artifacts/publish -p:RestoreLockedMode=true
-          if ($LASTEXITCODE -ne 0) { throw ".NET 10 application publish failed with exit code $LASTEXITCODE" }
-          dotnet build 'tools/LegacySqlCeExport/LegacySqlCeExport.csproj' -c Release -p:RestoreLockedMode=true
-          if ($LASTEXITCODE -ne 0) { throw "Legacy migration helper build failed with exit code $LASTEXITCODE" }
+          function Invoke-Checked([string[]] $Arguments) {
+            $output = & dotnet @Arguments 2>&1
+            $exit = $LASTEXITCODE
+            $output | ForEach-Object { Write-Output $_ }
+            if ($exit -ne 0) {
+              $detail = ($output | Select-Object -Last 18 | Out-String).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+              Write-Output "::error::$detail"
+              throw "dotnet failed with exit code $exit"
+            }
+          }
+          Invoke-Checked @('publish','TS SE Tool/TS SE Tool.csproj','-c','Release','-r','win-x86','--self-contained','true','-o','artifacts/publish','-p:RestoreLockedMode=true')
+          Invoke-Checked @('build','tools/LegacySqlCeExport/LegacySqlCeExport.csproj','-c','Release','-p:RestoreLockedMode=true')
 
       - name: Run .NET 10 production-code regressions
         shell: pwsh

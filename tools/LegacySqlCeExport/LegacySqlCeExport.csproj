@@ -8,6 +8,7 @@
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Microsoft.SqlServer.Compact" Version="4.0.8876.1" GeneratePathProperty="true" />
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
         <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
         <Content Include="$(PkgMicrosoft_SqlServer_Compact)\NativeBinaries\x86\*" Link="x86\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
