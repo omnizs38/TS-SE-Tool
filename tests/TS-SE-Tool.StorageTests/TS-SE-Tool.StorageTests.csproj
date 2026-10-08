@@ -4,6 +4,7 @@
         <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
         <Compile Include="../../TS SE Tool/Properties/Settings.Designer.cs" />
         <Compile Include="../../TS SE Tool/CustomClasses/Utilities/AtomicFile.cs" />
+        <Compile Include="../../TS SE Tool/CustomClasses/Utilities/SaveFileBatch.cs" />
         <Compile Include="../../TS SE Tool/CustomClasses/Program/LegacyPreferences.cs" />
         <Compile Include="../../TS SE Tool/CustomClasses/Storage/*.cs" />
         <Compile Include="../../TS SE Tool/CustomClasses/Updates/GitHubReleaseClient.cs" />

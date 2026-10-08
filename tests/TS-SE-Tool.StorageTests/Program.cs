@@ -26,6 +26,61 @@ internal static class Program
         string root = Path.Combine(Path.GetTempPath(), "tsset-storage-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
         try
         {
+            Test("save batch publishes all edits and retains matching binary backups", () =>
+            {
+                string a = Path.Combine(root, "profile.sii"), b = Path.Combine(root, "info.sii"), c = Path.Combine(root, "game.sii");
+                File.WriteAllBytes(a, new byte[] { 0, 255, 8 }); File.WriteAllText(b, "info-before"); File.WriteAllText(c, "game-before");
+                SaveFileBatch.Write(new[] { new SaveFileBatch.Entry(a, "profile-after"), new SaveFileBatch.Entry(b, null), new SaveFileBatch.Entry(c, "game-after", SaveFileBatch.Fingerprint(c)) });
+                Check(File.ReadAllText(a) == "profile-after" && File.ReadAllText(b) == "info-before" && File.ReadAllText(c) == "game-after");
+                Check(File.ReadAllBytes(Path.Combine(root, "profile_backup.sii")).SequenceEqual(new byte[] { 0, 255, 8 }));
+                Check(File.ReadAllText(Path.Combine(root, "game_backup.sii")) == "game-before");
+                Check(!Directory.GetFiles(root, "*.tmp").Any());
+            });
+            Test("save batch rolls back after each possible publication failure", () =>
+            {
+                for (int fault = 1; fault <= 3; fault++)
+                {
+                    string[] paths = new[] { "profile.sii", "info.sii", "game.sii" }.Select(n => Path.Combine(root, n)).ToArray();
+                    foreach (string path in paths) File.WriteAllText(path, "original-Алматы");
+                    bool threw = false;
+                    try { SaveFileBatch.Write(paths.Select(p => new SaveFileBatch.Entry(p, "edited")).ToArray(), step => { if (step == fault) throw new IOException("Injected failure"); }); }
+                    catch (IOException) { threw = true; }
+                    Check(threw && paths.All(p => File.ReadAllText(p) == "original-Алматы"));
+                    Check(!Directory.GetFiles(root, "*.tmp").Any());
+                }
+            });
+            if (OperatingSystem.IsWindows()) Test("locked second save rolls back first replacement on actual Windows I/O failure", () =>
+            {
+                string first = Path.Combine(root, "locked-profile.sii"), second = Path.Combine(root, "locked-info.sii");
+                File.WriteAllText(first, "original-profile"); File.WriteAllText(second, "original-info"); bool threw = false;
+                using (FileStream locked = new FileStream(second, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    try { SaveFileBatch.Write(new[] { new SaveFileBatch.Entry(first, "new-profile"), new SaveFileBatch.Entry(second, "new-info") }); }
+                    catch (IOException) { threw = true; }
+                }
+                Check(threw && File.ReadAllText(first) == "original-profile" && File.ReadAllText(second) == "original-info");
+                Check(!Directory.GetFiles(root, "*.tmp").Any());
+            });
+            Test("changed save with unchanged timestamp is rejected before backups", () =>
+            {
+                string path = Path.Combine(root, "concurrent.sii"); File.WriteAllText(path, "original"); string hash = SaveFileBatch.Fingerprint(path); DateTime stamp = File.GetLastWriteTimeUtc(path);
+                File.WriteAllText(path, "external"); File.SetLastWriteTimeUtc(path, stamp); bool threw = false;
+                try { SaveFileBatch.Write(new[] { new SaveFileBatch.Entry(path, "edited", hash) }); } catch (IOException) { threw = true; }
+                Check(threw && File.ReadAllText(path) == "external" && !File.Exists(Path.Combine(root, "concurrent_backup.sii")));
+            });
+            Test("empty serialization stages nothing and never touches original", () =>
+            {
+                string path = Path.Combine(root, "empty.sii"); File.WriteAllText(path, "keep"); bool threw = false;
+                try { SaveFileBatch.Write(new[] { new SaveFileBatch.Entry(path, "") }); } catch (InvalidDataException) { threw = true; }
+                Check(threw && File.ReadAllText(path) == "keep" && !Directory.GetFiles(root, "*.tmp").Any());
+            });
+            Test("incomplete rollback reports recovery and never overwrites external edits", () =>
+            {
+                string path = Path.Combine(root, "racing.sii"); File.WriteAllText(path, "original"); bool threw = false;
+                try { SaveFileBatch.Write(new[] { new SaveFileBatch.Entry(path, "edited") }, step => { File.WriteAllText(path, "external"); throw new IOException("Injected failure"); }); }
+                catch (AggregateException e) { threw = e.InnerExceptions.Count == 2; }
+                Check(threw && File.ReadAllText(path) == "external" && File.ReadAllText(Path.Combine(root, "racing_backup.sii")) == "original");
+            });
             Test("profile schema, metadata, repeated open", () =>
             {
                 string path = Path.Combine(root, "profile.sqlite"); SqliteStorage.Ensure(path, DatabaseKind.Profile, "ETS2", "profile", "Алматы"); SqliteStorage.Ensure(path, DatabaseKind.Profile);

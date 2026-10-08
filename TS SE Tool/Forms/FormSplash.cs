@@ -102,7 +102,7 @@ namespace TS_SE_Tool
         private void linkLabelHelpLocalPDF_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             const string file = "HowTo.pdf";
-            if (File.Exists(file)) { try { System.Diagnostics.Process.Start(file); } catch (Exception exception) { IO_Utilities.ErrorLogWriter("Could not open local help: " + exception); } }
+            if (File.Exists(file)) { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = true }); } catch (Exception exception) { IO_Utilities.ErrorLogWriter("Could not open local help: " + exception); } }
             else OpenUrl(Web_Utilities.RepositoryUrl + "#readme");
         }
         private void linkLabelHelpYouTube_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e) { OpenUrl(Web_Utilities.RepositoryUrl + "#features"); }

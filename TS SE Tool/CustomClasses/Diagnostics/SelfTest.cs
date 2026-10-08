@@ -1,4 +1,4 @@
-﻿/*
+/*
    Headless diagnostic harness added during the 2026 save-format investigation.
 
    Usage:  "TS SE Tool.exe" --selftest <pathToSaveFolder> [outputFolder]
@@ -49,16 +49,25 @@ namespace TS_SE_Tool.Diagnostics
                 return 2;
             }
 
-            string saveDir = args[1].TrimEnd('\\', '/');
+            _report.Clear();
+            string saveDir = Path.GetFullPath(args[1]);
             _outDir = args.Length > 2 && !args[2].StartsWith("--")
                 ? args[2]
-                : Path.Combine(Path.GetTempPath(), "tsset_selftest");
+                : Path.Combine(Path.GetTempPath(), "tsset_selftest_" + Guid.NewGuid().ToString("N"));
 
             int setLevel = -1;
             for (int i = 2; i < args.Length - 1; i++)
                 if (args[i] == "--set-level")
-                    int.TryParse(args[i + 1], out setLevel);
+                    if (!int.TryParse(args[i + 1], out setLevel) || setLevel < 0)
+                    { Console.Error.WriteLine("--set-level requires a non-negative integer."); return 2; }
 
+            _outDir = Path.GetFullPath(_outDir);
+            if (_outDir.Equals(saveDir, StringComparison.OrdinalIgnoreCase) ||
+                _outDir.StartsWith(saveDir.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Error.WriteLine("The diagnostic output folder must be outside the source save folder.");
+                return 2;
+            }
             Directory.CreateDirectory(_outDir);
 
             Say("=== TS SE Tool self-test ===");
@@ -119,7 +128,7 @@ namespace TS_SE_Tool.Diagnostics
             info.ProcessData(infoLines);
             ushort version = info.Version;
             Say("    savefile version = " + version);
-            CompareRoundTrip("info.sii", infoLines, info.PrintOut());
+            if (!CompareRoundTrip("info.sii", infoLines, info.PrintOut())) return 1;
             Say("");
 
             //--- 1b. profile.sii (written too whenever the profile tab is edited) ----
@@ -135,8 +144,9 @@ namespace TS_SE_Tool.Diagnostics
                     SaveFileProfileData profile = new SaveFileProfileData();
                     profile.ProcessData(profileLines);
                     File.WriteAllLines(Path.Combine(_outDir, "profile.decoded.sii"), profileLines);
-                    CompareRoundTrip("profile.sii", profileLines, profile.PrintOut());
+                    if (!CompareRoundTrip("profile.sii", profileLines, profile.PrintOut())) return 1;
                 }
+                else return 1;
                 Say("");
             }
 
@@ -258,6 +268,7 @@ namespace TS_SE_Tool.Diagnostics
             foreach (string s in lost.Take(40)) Say("        LOST " + s);
             Say("    duplicated block instances = " + dup.Count);
             foreach (string s in dup.Take(40)) Say("        DUP  " + s);
+            if (lost.Count > 0 || dup.Count > 0) return 1;
 
             //--- 6. reload what we just produced --------------------------------
             Say("");
@@ -313,7 +324,7 @@ namespace TS_SE_Tool.Diagnostics
         /// <summary>
         /// Line level comparison for the small single-block files (info.sii, profile.sii).
         /// </summary>
-        private static void CompareRoundTrip(string label, string[] original, string produced)
+        private static bool CompareRoundTrip(string label, string[] original, string produced)
         {
             var before = original.Select(x => x.Trim()).Where(x => x.Length > 0).OrderBy(x => x, StringComparer.Ordinal).ToList();
             var after = produced.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
@@ -322,15 +333,16 @@ namespace TS_SE_Tool.Diagnostics
             var lost = before.Except(after).ToList();
             var added = after.Except(before).ToList();
 
-            if (lost.Count == 0 && added.Count == 0)
+            if (before.SequenceEqual(after))
             {
                 Say("    " + label + " round-trip OK (" + before.Count + " lines)");
-                return;
+                return true;
             }
 
             Say("    " + label + " round-trip DIFFERS - lost=" + lost.Count + " added=" + added.Count);
             foreach (string l in lost.Take(15)) Say("        LOST  " + l);
             foreach (string l in added.Take(15)) Say("        ADDED " + l);
+            return false;
         }
 
         private static Dictionary<string, int> BlockInventory(string[] lines)
@@ -375,7 +387,7 @@ namespace TS_SE_Tool.Diagnostics
             Say("    format code = " + format);
 
             if (format == 1)
-                return Encoding.UTF8.GetString(data).Split(new[] { "\r\n" }, StringSplitOptions.None);
+                return Encoding.UTF8.GetString(data).Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
 
             uint outSize = 0;
             int result;
@@ -384,24 +396,26 @@ namespace TS_SE_Tool.Diagnostics
             {
                 fixed (byte* p = data) result = FormMain.SIIDecryptAndDecodeMemory(p, size, null, &outSize);
                 if (result != 0) { Say("    decrypt probe failed: " + result); return null; }
+                if (outSize == 0 || outSize > 512u * 1024 * 1024) throw new InvalidDataException("Invalid decoded size.");
                 byte[] outData = new byte[outSize];
                 fixed (byte* p = data)
                 fixed (byte* q = outData)
                     result = FormMain.SIIDecryptAndDecodeMemory(p, size, q, &outSize);
                 if (result != 0) { Say("    decrypt failed: " + result); return null; }
-                return Encoding.UTF8.GetString(outData).Split(new[] { "\r\n" }, StringSplitOptions.None);
+                return Encoding.UTF8.GetString(outData).Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             }
 
             if (format == 3 || format == 4)
             {
                 fixed (byte* p = data) result = FormMain.SIIDecodeMemory(p, size, null, &outSize);
                 if (result != 0) { Say("    decode probe failed: " + result); return null; }
+                if (outSize == 0 || outSize > 512u * 1024 * 1024) throw new InvalidDataException("Invalid decoded size.");
                 byte[] outData = new byte[outSize];
                 fixed (byte* p = data)
                 fixed (byte* q = outData)
                     result = FormMain.SIIDecodeMemory(p, size, q, &outSize);
                 if (result != 0) { Say("    decode failed: " + result); return null; }
-                return Encoding.UTF8.GetString(outData).Split(new[] { "\r\n" }, StringSplitOptions.None);
+                return Encoding.UTF8.GetString(outData).Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             }
 
             Say("    unsupported format code " + format);

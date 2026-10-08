@@ -783,7 +783,7 @@ namespace JR.Utils.GUI.Forms
                 try
                 {
                     Cursor.Current = Cursors.WaitCursor;
-                    Process.Start(e.LinkText);
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(e.LinkText) { UseShellExecute = true });
                 }
                 catch (Exception)
                 {

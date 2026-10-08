@@ -9,7 +9,7 @@ A maintained Windows save editor for **Euro Truck Simulator 2** and **American T
 
 This repository is the maintained source of TS SE Tool. Runtime links, update checks, CI and release artifacts point only to `omnizs38/TS-SE-Tool`. Required Apache-2.0 and third-party attribution is retained.
 
-The save pipeline supports save-file versions **61–97**, preserves unmodelled fields and writes through an atomic temporary file. The current ETS2 and ATS 1.61 releases use save-file version 97. Newer formats remain unverified until tested with real profiles; the editor shows a warning instead of silently claiming compatibility.
+The save pipeline supports save-file versions **61–97**, preserves unmodelled fields and stages all edits, keeps matching backups, and uses per-file atomic replacement with rollback on ordinary write failures. The current ETS2 and ATS 1.61 releases use save-file version 97. Newer formats remain unverified until tested with real profiles; the editor shows a warning instead of silently claiming compatibility.
 
 See [COMPATIBILITY.md](COMPATIBILITY.md) for the verified game/save matrix and validation policy.
 
@@ -72,7 +72,7 @@ Licensed under Apache-2.0. Required upstream and third-party attribution is reta
 
 ## .NET 10 / SQLite migration
 
-The development application uses an SDK-style `net10.0-windows` project, modern PackageReferences, System.Text.Json, BCL GZipStream, and Microsoft.Data.Sqlite. It is self-contained **win-x86** because the audited SII decoder is x86; it runs on x64-compatible Windows 10/11. The installer requires Windows 10 build 17763 or newer. OS servicing/support requirements still apply.
+The application uses an SDK-style `net10.0-windows` project, modern PackageReferences, System.Text.Json, BCL GZipStream, and Microsoft.Data.Sqlite. It is self-contained **win-x86** because the audited SII decoder is x86; it runs on x64-compatible Windows 10/11. The installer requires Windows 10 22H2 (build 19045) or newer; Windows 10 must have applicable ESU/security servicing. OS servicing/support requirements still apply.
 
 On first use, a sibling legacy `.sdf` is read by the isolated `migration/LegacySqlCeExport.exe` compatibility utility, then imported into a staged `.sqlite`. The original `.sdf` is never deleted or overwritten. Row counts and foreign keys are checked before the new database is published. Unknown/custom tables are copied, while application metadata is normalized to the current schema. If the importer, runtime, or source data is unavailable/invalid, migration fails without publishing an empty replacement. Back up the `dbs`, `gameref/cache`, `config.cfg`, and game profiles before upgrading.
 
@@ -80,4 +80,4 @@ Existing startup/update preferences are imported from the known legacy company/a
 
 The maintained Windows color dialog replaces the old external OpenPainter binary, retaining color selection and transparent/reset behavior. Legacy SQL CE native files are confined to the optional importer, not the application's runtime dependencies.
 
-CI builds the complete application, runs Windows updater/settings and shared/SQLite regressions, and smoke-tests the actual packaged WinForms resources, native decoder, and a synthetic SQL CE-to-SQLite migration. Real ETS2/ATS saves, high-DPI interaction, and installer upgrade/rollback remain manual release gates; a green build alone is not a claim that all game scenarios were tested.
+CI builds the complete application, runs Windows updater/settings and shared/SQLite regressions, and smoke-tests the actual packaged WinForms resources, native decoder, and a synthetic SQL CE-to-SQLite migration. CI also exercises synthetic no-edit/edited save serialization for versions 61–97, extended profile fields, save-write failure/rollback, and installer fresh/reinstall/uninstall data preservation. Real ETS2/ATS profiles, high-DPI interaction, historical-installer upgrades and update-after-exit remain unverified manual scenarios; a green build alone is not a claim that all game scenarios were tested. See `RELEASE_NOTES_1.63.0.md` for the release validation scope.
