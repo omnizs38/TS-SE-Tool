@@ -904,7 +904,10 @@ namespace TS_SE_Tool
             if (e.Error != null)
             {
                 ToggleMainControlsAccess(true);
-                ToggleControlsAccess(true);
+                // Preparation mutates the in-memory graph. A failed save must be
+                // reloaded rather than prepared a second time from partial state.
+                ToggleControlsAccess(false);
+                LoadedSaveHash = LoadedInfoHash = LoadedProfileHash = null;
 
                 string details = DescribeException(e.Error);
 
