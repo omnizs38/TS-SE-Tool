@@ -106,7 +106,7 @@ namespace TS_SE_Tool
         private List<ExtCargo> ExtCargoList;//Program cache
         private SqliteConnection DBconnection;//Program
 
-        private DateTime LastModifiedTimestamp; //+
+        private string LoadedSaveHash, LoadedInfoHash, LoadedProfileHash;
 
         internal Save.Items.SiiNunit SiiNunitData;
 
@@ -269,6 +269,15 @@ namespace TS_SE_Tool
         {
             DialogResult exitDR;
 
+            // Do not start an exit-triggered upgrade or terminate a multi-file write mid-operation.
+            if (workerLoadSaveFile?.IsBusy == true || BackgroundCacheBusy)
+            {
+                e.Cancel = true;
+                MessageBox.Show(this, "Wait for the current operation to finish before closing the application.",
+                    "Operation in progress", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
             if (this.ForseExit)            
                 return;
 
@@ -298,7 +307,7 @@ namespace TS_SE_Tool
             if(!Directory.Exists(folderPath))
                 Directory.CreateDirectory(folderPath);
 
-            Process.Start(folderPath);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folderPath) { UseShellExecute = true });
 
             //Copy default files
 

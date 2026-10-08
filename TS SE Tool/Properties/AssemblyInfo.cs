@@ -17,8 +17,8 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyCulture("")]
 [assembly: ComVisible(false)]
 [assembly: Guid("95eba823-26bf-4a49-a674-e294b403bc99")]
-[assembly: AssemblyVersion("1.62.1.0")]
-[assembly: AssemblyFileVersion("1.62.1.0")]
-[assembly: AssemblyInformationalVersion("1.62.1")]
+[assembly: AssemblyVersion("1.63.0.0")]
+[assembly: AssemblyFileVersion("1.63.0.0")]
+[assembly: AssemblyInformationalVersion("1.63.0")]
 
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("windows10.0.17763")]

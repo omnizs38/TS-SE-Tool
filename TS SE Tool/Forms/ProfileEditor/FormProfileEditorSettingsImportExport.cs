@@ -1,4 +1,4 @@
-﻿/*
+/*
    Copyright 2016-2022 LIPtoH <liptoh.codebase@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -619,7 +619,7 @@ namespace TS_SE_Tool
                     DialogResult dr = MessageBox.Show("ZIP Archive Created.\r\nOpen destination folder?", "Success", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
 
                     if (dr == DialogResult.Yes)
-                        System.Diagnostics.Process.Start(Directory.GetParent(zipFilePath).FullName);
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Directory.GetParent(zipFilePath).FullName) { UseShellExecute = true });
                 }
                 catch { }
             }

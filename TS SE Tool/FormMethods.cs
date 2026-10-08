@@ -430,7 +430,7 @@ namespace TS_SE_Tool
             JobsAmountAdded = 0;
             RandomValue = new Random();
 
-            LastModifiedTimestamp = new DateTime();
+            LoadedSaveHash = LoadedInfoHash = LoadedProfileHash = null;
 
             AddedJobsDictionary = new Dictionary<string, List<JobAdded>>();
             AddedJobsList = new List<JobAdded>();

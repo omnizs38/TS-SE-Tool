@@ -27,13 +27,13 @@ OutputBaseFilename=TS-SE-Tool-{#MyAppVersion}-setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-MinVersion=10.0.17763
+MinVersion=10.0.19045
 UninstallDisplayIcon={app}\TS SE Tool.exe
-VersionInfoVersion=1.62.1.0
+VersionInfoVersion=1.63.0.0
 VersionInfoCompany=omnizs38 and contributors
 VersionInfoDescription=TS SE Tool Setup
 VersionInfoProductName=TS SE Tool
-VersionInfoProductVersion=1.62.1.0
+VersionInfoProductVersion=1.63.0.0
 
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\libs\x86"
@@ -43,7 +43,10 @@ Type: files; Name: "{app}\libs\OpenPainter.ColorPicker.dll"
 Type: files; Name: "{app}\libs\ICSharpCode.SharpZipLib.dll"
 
 [Files]
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "dbs\*,gameref\*,config.cfg"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\dbs\*"; DestDir: "{app}\dbs"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "{#SourceDir}\gameref\*"; DestDir: "{app}\gameref"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "{#SourceDir}\config.cfg"; DestDir: "{app}"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
 
 [Icons]
 Name: "{autoprograms}\TS SE Tool"; Filename: "{app}\TS SE Tool.exe"; WorkingDir: "{app}"

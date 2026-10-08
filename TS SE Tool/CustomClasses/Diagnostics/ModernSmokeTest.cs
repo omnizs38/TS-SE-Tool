@@ -24,6 +24,7 @@ namespace TS_SE_Tool.Diagnostics
                 byte[] plaintext = Encoding.UTF8.GetBytes("SiiNunit\r\n{\r\n}\r\n");
                 fixed (byte* input = plaintext)
                     if (FormMain.SIIGetMemoryFormat(input, (uint)plaintext.Length) != 1) throw new InvalidDataException("The x86 native decoder did not recognize plaintext.");
+                SerializationRegression.Run();
                 Properties.Settings.Default.ShowSplashOnStartup = false;
                 Properties.Settings.Default.CheckUpdatesOnStartup = false;
                 Properties.Settings.Default.AutoInstallUpdates = false;
@@ -65,7 +66,7 @@ namespace TS_SE_Tool.Diagnostics
                     using (OpenPainter.ColorPicker.FormColorPicker color = new OpenPainter.ColorPicker.FormColorPicker(System.Drawing.Color.Transparent))
                         color.CreateControl();
                 }
-                File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "smoke-test-result.txt"), "PASS: .NET 10 WinForms initialization, x86 native decoder, read-only legacy migration, SQLite values and resources.");
+                File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "smoke-test-result.txt"), "PASS: .NET 10 WinForms initialization, x86 native decoder, read-only legacy migration, SQLite values, resources, synthetic no-edit/edited save v61-97 and extended profile fields.");
                 return 0;
             }
             catch (Exception exception)

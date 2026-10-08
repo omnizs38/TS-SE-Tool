@@ -43,6 +43,7 @@ internal static class RegressionTests
             Equal("original", File.ReadAllText(path));
             Equal(1, Directory.GetFiles(root).Length);
         }));
+        if (OperatingSystem.IsWindows())
         Run("locked target preserves original and cleans temporary file", () => InTemporaryDirectory(root =>
         {
             string path = Path.Combine(root, "game.sii");
@@ -52,6 +53,7 @@ internal static class RegressionTests
             Equal("original", File.ReadAllText(path));
             Equal(1, Directory.GetFiles(root).Length);
         }));
+        else Console.WriteLine("SKIP Windows file-share replacement semantics on this platform");
         Run("invalid numeric and timestamp settings preserve defaults and continue", () => InTemporaryDirectory(root =>
         {
             string path = Path.Combine(root, "config.cfg");

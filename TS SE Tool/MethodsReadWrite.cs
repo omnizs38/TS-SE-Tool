@@ -621,6 +621,9 @@ namespace TS_SE_Tool
                 return;
             }
 
+            LoadedProfileHash = SaveFileBatch.Fingerprint(SiiProfilePath);
+            LoadedInfoHash = SaveFileBatch.Fingerprint(SiiInfoPath);
+
             //=== Profile Info
             resulCheck = preProcessFile(SiiProfilePath, "Profile file");
 
@@ -675,13 +678,17 @@ namespace TS_SE_Tool
             //=== End
 
             //=== Save file
+            LoadedSaveHash = SaveFileBatch.Fingerprint(SiiSavePath);
             resulCheck = preProcessFile(SiiSavePath, "Save file");
 
             if (resulCheck.valid)
             {
                 tempSavefileInMemory = resulCheck.fileArray;
 
-                LastModifiedTimestamp = File.GetLastWriteTime(SiiSavePath);
+                if (LoadedSaveHash != SaveFileBatch.Fingerprint(SiiSavePath) ||
+                    LoadedProfileHash != SaveFileBatch.Fingerprint(SiiProfilePath) ||
+                    LoadedInfoHash != SaveFileBatch.Fingerprint(SiiInfoPath))
+                    throw new IOException("The save changed while loading. Reload it before editing.");
 
                 if (!NewPrepareData())
                 {
@@ -843,6 +850,17 @@ namespace TS_SE_Tool
 
         void worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
+            if (e.Error != null)
+            {
+                SetDefaultValues(false);
+                ToggleMainControlsAccess(true);
+                ToggleControlsAccess(false);
+                toolStripProgressBarMain.Value = 0;
+                IO_Utilities.ErrorLogWriter("Save load failed" + Environment.NewLine + DescribeException(e.Error));
+                MessageBox.Show(this, "The save could not be loaded. No save was written. See errorlog.log for details.",
+                    "Save load failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
             if (e.Cancelled == true)
             {
                 SetDefaultValues(false);
@@ -895,7 +913,7 @@ namespace TS_SE_Tool
                 string[] failedDialog = HelpTranslateDialogOrDefault("SaveWriteFailed",
                     "Error during Writing save file",
                     "Something went wrong during Writing Save file." + Environment.NewLine +
-                    "The save file itself was NOT modified." + Environment.NewLine + Environment.NewLine +
+                    "Reload the save before retrying. If rollback failed, restore profile_backup.sii, info_backup.sii and game_backup.sii from the same attempt." + Environment.NewLine + Environment.NewLine +
                     "{0}" + Environment.NewLine +
                     "Full details were appended to errorlog.log");
 
@@ -1052,7 +1070,7 @@ namespace TS_SE_Tool
 
             UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Info, "message_saving_file");
 
-            if (File.GetLastWriteTime(SiiSavePath) > LastModifiedTimestamp)
+            if (LoadedSaveHash == null || SaveFileBatch.Fingerprint(SiiSavePath) != LoadedSaveHash)
             {
                 UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Error, "error_file_was_modified");
                 IO_Utilities.LogWriter("Save game was modified - reload file to prevent progress loss");
@@ -1090,25 +1108,12 @@ namespace TS_SE_Tool
                 if (string.IsNullOrEmpty(saveText))
                     throw new InvalidOperationException("Serialised game.sii is empty - refusing to overwrite the save file.");
 
-                //Backup
-                string ProfileFolderPathBackup = Globals.SelectedProfilePath + "\\profile_backup.sii";
-                string SiiInfoPathBackup = Globals.SelectedSavePath + "\\info_backup.sii";
-                string SiiSavePathBackup = Globals.SelectedSavePath + "\\game_backup.sii";
-
-                File.Copy(ProfileFolderPath, ProfileFolderPathBackup, true);
-                File.Copy(SiiInfoPath, SiiInfoPathBackup, true);
-                File.Copy(SiiSavePath, SiiSavePathBackup, true);
-
-                //Write Profile data
-                if (profileText != null)
-                    WriteTextFileAtomic(ProfileFolderPath, profileText);
-
-                //Write Info data
-                if (infoText != null)
-                    WriteTextFileAtomic(SiiInfoPath, infoText);
-
-                //Write Save data
-                WriteTextFileAtomic(SiiSavePath, saveText);
+                SaveFileBatch.Write(new[]
+                {
+                    new SaveFileBatch.Entry(ProfileFolderPath, profileText, LoadedProfileHash),
+                    new SaveFileBatch.Entry(SiiInfoPath, infoText, LoadedInfoHash),
+                    new SaveFileBatch.Entry(SiiSavePath, saveText, LoadedSaveHash)
+                });
 
                 UpdateStatusBarMessage.ShowStatusMessage(SMStatus.Info, "message_file_saved");                
             }

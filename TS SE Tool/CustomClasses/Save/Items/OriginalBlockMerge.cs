@@ -107,6 +107,11 @@ namespace TS_SE_Tool.Save.Items
                     merged.Add(generated[tag]);
                     consumed.Add(tag);
                 }
+                else if (tag != null && ArrayIndex.IsMatch(tag) && generated.ContainsKey(BaseTagOf(tag)))
+                {
+                    // A modeled array was shortened by an edit. Its old indices must
+                    // not be resurrected; arrays absent from generated data stay intact.
+                }
                 else if (tag != null || line.Trim().Length > 0)
                 {
                     merged.Add(line);

@@ -1,4 +1,4 @@
-﻿/*
+/*
    Copyright 2016-2022 LIPtoH <liptoh.codebase@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -130,30 +130,30 @@ namespace TS_SE_Tool
             string pdf_path = Directory.GetCurrentDirectory() + @"\HowTo.pdf";
 
             if (File.Exists(pdf_path))
-                Process.Start(pdf_path);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(pdf_path) { UseShellExecute = true });
             else
                 MessageBox.Show("Missing manual. Try to repair via update", "HowTo.pdf not found");
         }
 
         private void youTubeVideoToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Process.Start(Utilities.Web_Utilities.External.linkYoutubeTutorial);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Utilities.Web_Utilities.External.linkYoutubeTutorial) { UseShellExecute = true });
         }
 
         //Downloads
         private void checkGitHubRelesesToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Process.Start(Utilities.Web_Utilities.External.linkGithubReleases);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Utilities.Web_Utilities.External.linkGithubReleases) { UseShellExecute = true });
         }
 
         private void checkTMPForumToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Process.Start(Utilities.Web_Utilities.External.linkTMPforum);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Utilities.Web_Utilities.External.linkTMPforum) { UseShellExecute = true });
         }
 
         private void checkSCSForumToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Process.Start(Utilities.Web_Utilities.External.linkSCSforum);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Utilities.Web_Utilities.External.linkSCSforum) { UseShellExecute = true });
         }
 
         private void latestStableToolStripMenuItem_Click(object sender, EventArgs e)
@@ -436,7 +436,7 @@ namespace TS_SE_Tool
         {
             //Open Save Folder
             if (Directory.Exists(Globals.SavesHex[comboBoxSaves.SelectedIndex]))
-                Process.Start(Globals.SavesHex[comboBoxSaves.SelectedIndex]);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Globals.SavesHex[comboBoxSaves.SelectedIndex]) { UseShellExecute = true });
         }
 
         internal static BackgroundWorker workerLoadSaveFile;

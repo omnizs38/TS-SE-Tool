@@ -16,14 +16,14 @@
 
 The main application is not net48. A narrow **optional net48 x86 importer** remains solely because SQL CE has no supported .NET 10 provider. It is not required for normal SQLite operation. The native x86 SII decoder remains attributed and pinned rather than replaced with an unverified binary. These exceptions must be stated honestly in release notes.
 
-## Release gates
+## Validation scope for 1.63.0
 
 - Windows 10/11 game-save no-edit and edited round trips for ETS2 and ATS; save versions 61–97 and unknown blocks/fields.
 - High-DPI/narrow-window interaction, native color selection/reset, and real profile/cache data migration including older schema versions.
-- Installer upgrade/uninstall, runtime-less modern startup, failed-upgrade recovery, optional importer prerequisites, update-after-exit, and OS servicing/ESU compatibility.
-- Multi-file profile/info/game consistency is still not transactional; keep backups and do not claim otherwise.
+- CI covers fresh installation, reinstall/upgrade preserving existing packaged and user-owned database/cache files, and uninstall retaining user data. Historical-version installer upgrades, optional importer prerequisites, update-after-exit, and OS servicing/ESU compatibility still need manual validation.
+- Save writes stage every edited file, fingerprint loaded input, complete matching backups before publication, and roll back on ordinary I/O failures. Rollback refuses to overwrite third-party changes and reports recovery errors. Abrupt power loss and concurrent game writes are not a cross-file transaction; keep backups and close the game before editing.
 
-No new version/tag/release is implied by this development migration. Build validation does not replace the manual game/installer gates.
+Release 1.63.0 includes this migration. CI additionally covers synthetic no-edit/edited versions 61–97 and extended profile fields. No real game profile was supplied for this release; these synthetic checks do not replace in-game Windows 10/11 testing.
 
 ## Sources
 
